@@ -1,5 +1,13 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  browserPopupRedirectResolver,
+  getAuth,
+  signInAnonymously,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
 import {
   getDatabase,
   onChildAdded,
@@ -33,6 +41,30 @@ let listeners: Listener[] = [];
 let username = '';
 let database: ReturnType<typeof getDatabase> | null = null;
 
+export function firebaseReady() {
+  return configured;
+}
+
+function firebaseAuth() {
+  if (!configured) throw new Error('Firebase is not configured. Add the values from .env.local.');
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  return getAuth(app);
+}
+
+export async function signUpWithEmail(email: string, password: string) {
+  return createUserWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+}
+
+export async function signInWithEmail(email: string, password: string) {
+  return signInWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+}
+
+export async function signInWithGoogle() {
+  const auth = firebaseAuth();
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(auth, provider, browserPopupRedirectResolver);
+}
+
 function emit(event: RealtimeEvent) {
   listeners.forEach((listener) => listener(event));
 }
@@ -49,9 +81,9 @@ function userRecord(name: string, phone: string) {
 export async function connectRealtime(name: string, nextUsername: string, phone = '') {
   if (!configured) return;
   username = nextUsername.toLowerCase();
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  await signInAnonymously(auth);
+  const auth = firebaseAuth();
+  if (!auth.currentUser) await signInAnonymously(auth);
+  const app = getApps()[0];
   database = getDatabase(app);
 
   await set(ref(database, `users/${username}`), userRecord(name, phone));

@@ -18,6 +18,7 @@ import { GrainOverlay } from '../components/AmbientBackground';
 import { Icon } from '../components/icons';
 import { useStore } from '../store/useStore';
 import { isValidUsername } from '../lib/types';
+import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/realtime';
 
 type Flow = 'welcome' | 'account' | 'profile' | 'contact' | 'verify';
 type AuthMode = 'signup' | 'login';
@@ -33,9 +34,12 @@ export function OnboardingScreen() {
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
 
   const usernameValue = username.trim().toLowerCase();
   const currentSteps = authMode === 'signup' ? signupSteps : loginSteps;
@@ -68,6 +72,14 @@ export function OnboardingScreen() {
         setError('That username is already taken. Try another one.');
         return false;
       }
+      if (!email.trim() || !email.includes('@')) {
+        setError('Enter a valid email address.');
+        return false;
+      }
+      if (password.length < 6) {
+        setError('Your password must be at least 6 characters.');
+        return false;
+      }
     }
     if (flow === 'profile' && !name.trim()) {
       setError('Add your name so people know it is you.');
@@ -84,14 +96,41 @@ export function OnboardingScreen() {
     return true;
   };
 
-  const next = () => {
+  const next = async () => {
     if (!validateCurrentStep()) return;
+    if (flow === 'account') {
+      setAuthBusy(true);
+      try {
+        if (isLogin) await signInWithEmail(email, password);
+        else await signUpWithEmail(email, password);
+        goTo(currentSteps[stepIndex + 1]);
+      } catch (authError: any) {
+        const code = String(authError?.code ?? '');
+        setError(code.includes('email-already-in-use') ? 'That email is already registered. Try Log in.' : code.includes('invalid-credential') ? 'Email or password is incorrect.' : 'We could not complete authentication. Check your connection and try again.');
+      } finally {
+        setAuthBusy(false);
+      }
+      return;
+    }
     if (flow === 'verify') {
       complete(name.trim() || 'You', usernameValue, phone);
       return;
     }
     const nextStep = currentSteps[stepIndex + 1];
     if (nextStep) goTo(nextStep);
+  };
+
+  const googleAuth = async () => {
+    setAuthBusy(true);
+    setError('');
+    try {
+      await signInWithGoogle();
+      goTo(isLogin ? 'contact' : 'profile');
+    } catch {
+      setError('Google sign-in was cancelled or could not be completed.');
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   const startAuth = (nextMode: AuthMode) => {
@@ -136,7 +175,7 @@ export function OnboardingScreen() {
                 <View style={styles.formArea}>
                   <Text style={[styles.eyebrow, { color: palette.ember }]}>{isLogin ? 'WELCOME BACK' : 'CREATE YOUR SPACE'}</Text>
                   {flow === 'account' ? (
-                    <AccountStep palette={palette} mode={mode} authMode={authMode} username={username} setUsername={setUsername} />
+                    <AccountStep palette={palette} mode={mode} authMode={authMode} username={username} setUsername={setUsername} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onGoogle={googleAuth} />
                   ) : null}
                   {flow === 'profile' ? (
                     <ProfileStep palette={palette} name={name} setName={setName} />
@@ -148,7 +187,7 @@ export function OnboardingScreen() {
                     <VerifyStep palette={palette} phone={phone} code={code} setCode={setCode} />
                   ) : null}
                   {error ? <Text style={[styles.error, { color: palette.bad }]}>{error}</Text> : null}
-                  <TButton title={flow === 'verify' ? 'Enter Tangent' : 'Continue'} onPress={next} />
+                  <TButton title={authBusy ? 'Connecting…' : flow === 'verify' ? 'Enter Tangent' : 'Continue'} onPress={() => void next()} />
                   {flow === 'account' ? (
                     <Pressable onPress={() => startAuth(isLogin ? 'signup' : 'login')} style={styles.switchMode}>
                       <Text style={[styles.switchText, { color: palette.textSecondary }]}>
@@ -203,7 +242,7 @@ function Promise({ icon, label, palette }: { icon: 'shield' | 'clock'; label: st
   );
 }
 
-function AccountStep({ palette, mode, authMode, username, setUsername }: { palette: ReturnType<typeof useTheme>['palette']; mode: 'light' | 'dark'; authMode: AuthMode; username: string; setUsername: (value: string) => void }) {
+function AccountStep({ palette, mode, authMode, username, setUsername, email, setEmail, password, setPassword, onGoogle }: { palette: ReturnType<typeof useTheme>['palette']; mode: 'light' | 'dark'; authMode: AuthMode; username: string; setUsername: (value: string) => void; email: string; setEmail: (value: string) => void; password: string; setPassword: (value: string) => void; onGoogle: () => void }) {
   return (
     <>
       <Text style={[styles.formTitle, { color: palette.textPrimary }]}>{authMode === 'login' ? 'Good to see you.' : 'Your identity, your way.'}</Text>
@@ -211,6 +250,11 @@ function AccountStep({ palette, mode, authMode, username, setUsername }: { palet
       <FieldLabel text="USERNAME" palette={palette} />
       <TextInput value={username} onChangeText={(value) => setUsername(value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))} placeholder="your.name" autoCapitalize="none" autoCorrect={false} placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent' }]} autoFocus />
       <Text style={[styles.inputHint, { color: palette.textSecondary }]}>Lowercase letters, numbers, . _ -</Text>
+      <FieldLabel text="EMAIL" palette={palette} />
+      <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent' }]} />
+      <FieldLabel text="PASSWORD" palette={palette} />
+      <TextInput value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent' }]} />
+      {Platform.OS === 'web' ? <><Text style={[styles.or, { color: palette.textSecondary }]}>or</Text><TButton title="Continue with Google" onPress={onGoogle} variant="ghost" /></> : null}
     </>
   );
 }
@@ -295,4 +339,5 @@ const styles = StyleSheet.create({
   error: { fontSize: typeScale.caption.size, lineHeight: 20, marginVertical: spacing.md },
   switchMode: { alignItems: 'center', paddingVertical: spacing.lg },
   switchText: { fontSize: typeScale.caption.size },
+  or: { textAlign: 'center', fontSize: typeScale.caption.size, marginVertical: spacing.md },
 });
