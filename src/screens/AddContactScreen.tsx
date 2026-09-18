@@ -338,7 +338,7 @@ function ScanPane({ onOpenChat }: { onOpenChat: (id: string) => void }) {
             }
             const found = findByUsername(uname);
             if (!found) {
-              setUnknown(`@${uname} is not in this demo directory.`);
+              setUnknown(`@${uname} is not on Tangent yet.`);
               return;
             }
             setUnknown('');

@@ -17,6 +17,7 @@ export function SettingsScreen({ navigation }: any) {
   const setLite = useStore((s) => s.setLiteMode);
   const me = useStore((s) => s.currentUser);
   const logout = useStore((s) => s.logout);
+  const starredCount = useStore((s) => s.messages.filter((message) => message.starred).length);
 
 
   return (
@@ -38,6 +39,18 @@ export function SettingsScreen({ navigation }: any) {
         </View>
         <Icon name="forward" size={18} color={palette.textSecondary} />
       </Pressable>
+
+      <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.label, { color: palette.textPrimary }]}>Starred messages</Text>
+            <Text style={[styles.desc, { color: palette.textSecondary }]}>
+              {starredCount === 0 ? 'Save messages you want to find again.' : `${starredCount} saved message${starredCount === 1 ? '' : 's'}`}
+            </Text>
+          </View>
+          <Icon name="star" size={19} color={palette.ember} />
+        </View>
+      </View>
 
       <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
         <View style={styles.row}>

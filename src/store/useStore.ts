@@ -24,6 +24,12 @@ export interface AuthDraft {
   password: string;
 }
 
+export interface WhisperSession {
+  id: string;
+  startedAt: number;
+  expiresAt?: number;
+}
+
 const emptyDraft: AuthDraft = { name: '', username: '', email: '', password: '' };
 
 interface TangentState {
@@ -36,7 +42,7 @@ interface TangentState {
   threads: TangentThread[];
   liteMode: boolean;
   whisperUnlocked: Record<string, boolean>; // chatId -> unlocked
-  whisperSessions: Record<string, string>;
+  whisperSessions: Record<string, WhisperSession>;
   completeOnboarding: (name: string, username: string, phone: string) => void;
   authDraft: AuthDraft;
   setAuthDraft: (patch: Partial<AuthDraft>) => void;
@@ -61,7 +67,8 @@ interface TangentState {
   hideMessage: (messageId: string) => void;
   unhideMessage: (messageId: string) => void;
   setWhisperUnlocked: (chatId: string, v: boolean) => void;
-  startWhisperSession: (chatId: string) => void;
+  startWhisperSession: (chatId: string, durationMinutes?: number) => void;
+  expireWhisperSession: (chatId: string) => void;
   finishWhisperSession: (chatId: string, choice: 'keep' | 'hide' | 'delete') => void;
   createThread: (chatId: string, rootMessageId: string, title: string) => string;
   replyInThread: (threadId: string, text: string) => void;
@@ -287,7 +294,7 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
       createdAt: Date.now(),
       receipt: 'sending',
       replyToId: opts?.replyToId,
-      whisperSessionId: get().whisperSessions[chatId],
+      whisperSessionId: get().whisperSessions[chatId]?.id,
       reactions: [],
     };
     set((s) => ({ messages: [...s.messages, msg] }));
@@ -403,8 +410,29 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
   setWhisperUnlocked: (chatId, v) =>
     set((s) => ({ whisperUnlocked: { ...s.whisperUnlocked, [chatId]: v } })),
 
-  startWhisperSession: (chatId) =>
-    set((s) => ({ whisperSessions: { ...s.whisperSessions, [chatId]: uid('whisper') } })),
+  startWhisperSession: (chatId, durationMinutes) =>
+    set((s) => ({
+      whisperSessions: {
+        ...s.whisperSessions,
+        [chatId]: {
+          id: uid('whisper'),
+          startedAt: Date.now(),
+          expiresAt: durationMinutes ? Date.now() + durationMinutes * 60_000 : undefined,
+        },
+      },
+      whisperUnlocked: { ...s.whisperUnlocked, [chatId]: true },
+    })),
+
+  expireWhisperSession: (chatId) =>
+    set((s) => ({
+      whisperSessions: Object.fromEntries(Object.entries(s.whisperSessions).filter(([id]) => id !== chatId)),
+      whisperUnlocked: { ...s.whisperUnlocked, [chatId]: false },
+      messages: s.messages.map((message) =>
+        message.chatId === chatId && message.whisperSessionId
+          ? { ...message, hidden: true }
+          : message,
+      ),
+    })),
 
   finishWhisperSession: (chatId, choice) =>
     set((s) => ({

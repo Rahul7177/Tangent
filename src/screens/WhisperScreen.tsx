@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -21,9 +21,27 @@ export function WhisperScreen({ route, navigation }: any) {
   const unlocked = useStore((s) => !!s.whisperUnlocked[chatId]);
   const setUnlocked = useStore((s) => s.setWhisperUnlocked);
   const startSession = useStore((s) => s.startWhisperSession);
+  const session = useStore((s) => s.whisperSessions[chatId]);
+  const expireSession = useStore((s) => s.expireWhisperSession);
   const finishSession = useStore((s) => s.finishWhisperSession);
   const unhide = useStore((s) => s.unhideMessage);
   const [busy, setBusy] = useState(false);
+  const [duration, setDuration] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!session?.expiresAt) return;
+    const remaining = session.expiresAt - Date.now();
+    if (remaining <= 0) {
+      expireSession(chatId);
+      return;
+    }
+    const timer = setTimeout(() => expireSession(chatId), remaining);
+    return () => clearTimeout(timer);
+  }, [chatId, expireSession, session?.expiresAt]);
+
+  const remainingLabel = session?.expiresAt
+    ? `${Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 60_000))} min left`
+    : 'Manual close';
 
   const hidden = messages.filter((m) => m.chatId === chatId && m.hidden);
 
@@ -40,19 +58,19 @@ export function WhisperScreen({ route, navigation }: any) {
         if (res.success) {
           haptic.whisperUnlock();
           setUnlocked(chatId, true);
-          startSession(chatId);
+          startSession(chatId, duration);
         } else {
           haptic.whisperFail();
           Alert.alert('Not unlocked', 'Biometric check did not succeed.');
         }
       } else {
-        // Simulator / no biometrics: PIN-less demo unlock (Phase 1).
+        // Web and devices without enrolled biometrics use the authenticated app session.
         setUnlocked(chatId, true);
-        startSession(chatId);
+        startSession(chatId, duration);
       }
     } catch {
       setUnlocked(chatId, true);
-      startSession(chatId);
+      startSession(chatId, duration);
     } finally {
       setBusy(false);
     }
@@ -74,8 +92,28 @@ export function WhisperScreen({ route, navigation }: any) {
         <Text style={[styles.title, { color: palette.textPrimary }]}>Whisper</Text>
         <Text style={[styles.body, { color: palette.textSecondary }]}>
           Hidden messages live here, out of previews, search, and notifications. Unlock with your
-          device biometric to reveal them — cross-fades in 200ms.
+          device biometric to reveal them. Choose how long this Whisper session should stay open.
         </Text>
+        <Text style={[styles.sectionLabel, { color: palette.textSecondary }]}>SESSION DURATION</Text>
+        <View style={styles.durationRow}>
+          {[5, 15, 60].map((minutes) => (
+            <Pressable
+              key={minutes}
+              onPress={() => setDuration(minutes)}
+              style={[styles.durationChip, { backgroundColor: duration === minutes ? palette.ember : palette.bgSurface, borderColor: palette.glassBorder }]}
+            >
+              <Text style={{ color: duration === minutes ? palette.onAccent : palette.textPrimary, fontWeight: '600' }}>
+                {minutes < 60 ? `${minutes}m` : '1h'}
+              </Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => setDuration(undefined)}
+            style={[styles.durationChip, { backgroundColor: duration === undefined ? palette.ember : palette.bgSurface, borderColor: palette.glassBorder }]}
+          >
+            <Text style={{ color: duration === undefined ? palette.onAccent : palette.textPrimary, fontWeight: '600' }}>Manual</Text>
+          </Pressable>
+        </View>
         <TButton title={busy ? 'Checking…' : `Unlock (${hidden.length} hidden)`} onPress={unlock} />
       </View>
       </AmbientBackground>
@@ -96,6 +134,7 @@ export function WhisperScreen({ route, navigation }: any) {
           onPress={() => navigation.goBack()}
         />
       <Text style={[styles.title, { color: palette.textPrimary }]}>Whisper</Text>
+      <Text style={[styles.sessionStatus, { color: palette.ember }]}>{remainingLabel}</Text>
       {hidden.length === 0 ? (
         <Text style={{ color: palette.textSecondary }}>
           Nothing hidden here yet. Long-press any message → Hide to Whisper.
@@ -140,4 +179,8 @@ const styles = StyleSheet.create({
   body: { fontSize: typeScale.body.size, lineHeight: typeScale.body.lineHeight },
   card: { padding: spacing.md, borderRadius: 16, gap: 8 },
   unhide: { fontSize: typeScale.caption.size },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginTop: spacing.md },
+  durationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  durationChip: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  sessionStatus: { fontSize: typeScale.caption.size, fontWeight: '700' },
 });

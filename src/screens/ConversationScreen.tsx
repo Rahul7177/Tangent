@@ -338,7 +338,7 @@ export function ConversationScreen({ route, navigation }: any) {
             iconSize={22}
             color={palette.textSecondary}
             backgroundColor={palette.bgSurface}
-            onPress={() => Alert.alert('Attach', 'Photos, voice notes & GIFs land here in Phase 2.')}
+            onPress={() => Alert.alert('Attachments', 'Text chat is ready. Photo, GIF, and file sharing will be added in a later update.')}
           />
           <View style={[styles.inputPill, { backgroundColor: palette.bgSurface }]}>
             <TextInput
@@ -371,7 +371,7 @@ export function ConversationScreen({ route, navigation }: any) {
               iconSize={22}
               color={palette.textSecondary}
               backgroundColor={palette.bgRaised}
-              onPress={() => Alert.alert('Voice note', 'Hold-to-record lands here in Phase 2.')}
+              onPress={() => Alert.alert('Voice notes', 'Voice notes are not available yet. You can send text instantly while we keep the app lightweight.')}
             />
           )}
         </View>
