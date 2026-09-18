@@ -5,12 +5,13 @@ import {
   GoogleAuthProvider,
   browserPopupRedirectResolver,
   getAuth,
+  onAuthStateChanged,
   signOut,
-  signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import {
   getDatabase,
   onChildAdded,
@@ -73,6 +74,25 @@ async function prepareAuth() {
   return auth;
 }
 
+function waitForAuthenticatedUser(auth: ReturnType<typeof getAuth>) {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return new Promise<User>((resolve, reject) => {
+    let settled = false;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      if (user) resolve(user);
+      else reject(new Error('No authenticated Firebase session is available. Please log in again.'));
+    }, (error) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      reject(error);
+    });
+  });
+}
+
 export async function signOutRealtime() {
   if (reconnectTimer) clearTimeout(reconnectTimer);
   reconnectTimer = null;
@@ -118,11 +138,16 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   detachRealtime.forEach((detach) => detach());
   detachRealtime = [];
   const auth = await prepareAuth();
-  if (!auth.currentUser) await signInAnonymously(auth);
+  const signedInUser = await waitForAuthenticatedUser(auth);
   const app = getApps()[0];
   database = getDatabase(app);
 
-  await set(ref(database, `users/${username}`), userRecord(name, phone));
+  const profileRef = ref(database, `users/${username}`);
+  const existingProfile = (await get(profileRef)).val() as { ownerId?: string } | null;
+  if (existingProfile?.ownerId && existingProfile.ownerId !== signedInUser.uid) {
+    throw new Error('This browser session belongs to a different Tangent account. Log out and sign in again.');
+  }
+  await set(profileRef, userRecord(name, phone));
   detachRealtime.push(onValue(ref(database, 'users'), (snapshot) => {
     const users = Object.values(snapshot.val() ?? {}) as DirectoryUser[];
     emit({ type: 'directory', users });
