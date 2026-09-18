@@ -9,6 +9,15 @@ export interface CurrentUser {
   phone: string;
 }
 
+export interface AuthDraft {
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+}
+
+const emptyDraft: AuthDraft = { name: '', username: '', email: '', password: '' };
+
 interface TangentState {
   onboarded: boolean;
   userName: string;
@@ -20,6 +29,9 @@ interface TangentState {
   liteMode: boolean;
   whisperUnlocked: Record<string, boolean>; // chatId -> unlocked
   completeOnboarding: (name: string, username: string, phone: string) => void;
+  authDraft: AuthDraft;
+  setAuthDraft: (patch: Partial<AuthDraft>) => void;
+  clearAuthDraft: () => void;
   usernameTaken: (username: string) => boolean;
   searchDirectory: (query: string) => DirectoryUser[];
   findUserByUsername: (username: string) => DirectoryUser | undefined;
@@ -83,6 +95,7 @@ export const useStore = create<TangentState>((set, get) => ({
       onboarded: true,
       userName: cleanName,
       currentUser: { name: cleanName, username: uname, phone: phone.trim() },
+      authDraft: { ...emptyDraft },
     });
     if (!realtimeBound) {
       realtimeBound = true;
@@ -124,7 +137,7 @@ export const useStore = create<TangentState>((set, get) => ({
             return {
               messages: nextMessages,
               chats: hasChat
-                ? s.chats.map((chat) => chat.id === chatId ? { ...chat, unread: chat.unread + 1, online: true } : chat)
+                ? s.chats.map((chat) => chat.id === chatId ? { ...chat, unread: exists ? chat.unread : chat.unread + 1, online: true } : chat)
                 : [...s.chats, nextChat],
             };
           });
@@ -136,8 +149,11 @@ export const useStore = create<TangentState>((set, get) => ({
     });
   },
 
-  usernameTaken: (username) => {
-    const u = username.trim().toLowerCase();
+  authDraft: { ...emptyDraft },
+  setAuthDraft: (patch) => set((s) => ({ authDraft: { ...s.authDraft, ...patch } })),
+  clearAuthDraft: () => set({ authDraft: { ...emptyDraft } }),
+
+  usernameTaken: (username) => {    const u = username.trim().toLowerCase();
     if (!isValidUsername(u)) return true;
     if (get().currentUser.username === u) return true;
     return get().directory.some((d) => d.username === u);

@@ -16,6 +16,7 @@ import {
   ref,
   serverTimestamp,
   set,
+  get,
 } from 'firebase/database';
 import { ChatMessage, DirectoryUser } from './types';
 
@@ -40,6 +41,8 @@ const configured = Object.values(firebaseConfig).every(Boolean);
 let listeners: Listener[] = [];
 let username = '';
 let database: ReturnType<typeof getDatabase> | null = null;
+let connectedUsername = '';
+let detachRealtime: (() => void)[] = [];
 
 export function firebaseReady() {
   return configured;
@@ -81,24 +84,28 @@ function userRecord(name: string, phone: string) {
 export async function connectRealtime(name: string, nextUsername: string, phone = '') {
   if (!configured) return;
   username = nextUsername.toLowerCase();
+  if (connectedUsername === username && database) return;
+  detachRealtime.forEach((detach) => detach());
+  detachRealtime = [];
   const auth = firebaseAuth();
   if (!auth.currentUser) await signInAnonymously(auth);
   const app = getApps()[0];
   database = getDatabase(app);
 
   await set(ref(database, `users/${username}`), userRecord(name, phone));
-  onValue(ref(database, 'users'), (snapshot) => {
+  detachRealtime.push(onValue(ref(database, 'users'), (snapshot) => {
     const users = Object.values(snapshot.val() ?? {}) as DirectoryUser[];
     emit({ type: 'directory', users });
-  });
-  onValue(ref(database, `presence/${username}`), (snapshot) => {
+  }));
+  detachRealtime.push(onValue(ref(database, `presence/${username}`), (snapshot) => {
     if (snapshot.exists()) emit({ type: 'presence', username, online: Boolean(snapshot.val()) });
-  });
+  }));
   await set(ref(database, `presence/${username}`), true);
-  onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
+  detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
     const message = snapshot.val() as ChatMessage;
     if (message.sender !== username) emit({ type: 'message', message });
-  });
+  }));
+  connectedUsername = username;
 }
 
 export function subscribeRealtime(listener: Listener) {
@@ -111,7 +118,7 @@ export function subscribeRealtime(listener: Listener) {
 export function publishRealtime(payload: { type: 'message'; to: string; text: string; replyToId?: string; clientId?: string }) {
   if (!database || !username || payload.type !== 'message') return;
   const messageRef = push(ref(database, `messages/${chatIdFor(username, payload.to)}`));
-  const message = {
+  const message: Record<string, unknown> = {
     id: payload.clientId ?? messageRef.key,
     chatId: chatIdFor(username, payload.to),
     sender: username,
@@ -122,13 +129,24 @@ export function publishRealtime(payload: { type: 'message'; to: string; text: st
     createdAt: Date.now(),
     serverCreatedAt: serverTimestamp(),
     receipt: 'delivered' as const,
-    replyToId: payload.replyToId,
     reactions: [],
   };
-  void set(messageRef, message);
-  void set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to });
+  if (payload.replyToId) message.replyToId = payload.replyToId;
+  void set(messageRef, message).catch((error) => console.warn('Message archive failed:', error));
+  void set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to })
+    .catch((error) => console.warn('Message delivery failed:', error));
 }
 
 export function isRealtimeConfigured() {
   return configured;
+}
+
+export async function signedInProfile() {
+  const auth = firebaseAuth();
+  if (!auth.currentUser) return undefined;
+  const app = getApps()[0];
+  const databaseRef = getDatabase(app);
+  const snapshot = await get(ref(databaseRef, 'users'));
+  const users = Object.values(snapshot.val() ?? {}) as Array<DirectoryUser & { ownerId?: string }>;
+  return users.find((user) => user.ownerId === auth.currentUser?.uid);
 }
