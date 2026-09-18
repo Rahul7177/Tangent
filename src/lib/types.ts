@@ -20,6 +20,9 @@ export interface ChatMessage {
   replyToId?: string;
   reactions: Reaction[];
   hidden?: boolean;
+  pinned?: boolean;
+  starred?: boolean;
+  whisperSessionId?: string;
   threadCount?: number;
   offlineQueued?: boolean;
 }

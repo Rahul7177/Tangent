@@ -116,6 +116,8 @@ export function ChatBubble({
       ) : null}
       <Text style={[styles.text, { color: ink }]}>{msg.text}</Text>
       <View style={styles.metaRow}>
+        {msg.pinned ? <Icon name="pin" size={12} color={inkDim} /> : null}
+        {msg.starred ? <Icon name="star" size={12} color={inkDim} /> : null}
         <Text style={[styles.time, { color: inkDim }]}>{formatTime(msg.createdAt)}</Text>
         {mine ? <Ticks receipt={msg.receipt} color={inkDim} readColor={ink} /> : null}
       </View>

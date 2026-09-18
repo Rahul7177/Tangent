@@ -36,6 +36,7 @@ interface TangentState {
   threads: TangentThread[];
   liteMode: boolean;
   whisperUnlocked: Record<string, boolean>; // chatId -> unlocked
+  whisperSessions: Record<string, string>;
   completeOnboarding: (name: string, username: string, phone: string) => void;
   authDraft: AuthDraft;
   setAuthDraft: (patch: Partial<AuthDraft>) => void;
@@ -52,11 +53,16 @@ interface TangentState {
   receiveMessage: (chatId: string, text: string, sender?: string) => void;
   editMessage: (messageId: string, text: string) => void;
   deleteMessage: (messageId: string) => void;
+  deleteMessageForEveryone: (messageId: string) => void;
+  toggleStarMessage: (messageId: string) => void;
+  togglePinMessage: (messageId: string) => boolean;
   markMessagesRead: (chatId: string) => void;
   toggleReaction: (messageId: string, emoji: string) => void;
   hideMessage: (messageId: string) => void;
   unhideMessage: (messageId: string) => void;
   setWhisperUnlocked: (chatId: string, v: boolean) => void;
+  startWhisperSession: (chatId: string) => void;
+  finishWhisperSession: (chatId: string, choice: 'keep' | 'hide' | 'delete') => void;
   createThread: (chatId: string, rootMessageId: string, title: string) => string;
   replyInThread: (threadId: string, text: string) => void;
   setLiteMode: (v: boolean) => void;
@@ -88,6 +94,7 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
   threads: [],
   liteMode: false,
   whisperUnlocked: {},
+  whisperSessions: {},
 
   completeOnboarding: (name, username, phone) => {
     const cleanName = name.trim() || 'You';
@@ -280,6 +287,7 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
       createdAt: Date.now(),
       receipt: 'sending',
       replyToId: opts?.replyToId,
+      whisperSessionId: get().whisperSessions[chatId],
       reactions: [],
     };
     set((s) => ({ messages: [...s.messages, msg] }));
@@ -334,6 +342,31 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
   deleteMessage: (messageId) =>
     set((s) => ({ messages: s.messages.filter((x) => x.id !== messageId) })),
 
+  deleteMessageForEveryone: (messageId) =>
+    set((s) => ({
+      messages: s.messages.map((x) =>
+        x.id === messageId ? { ...x, text: 'This message was deleted', kind: 'system' } : x,
+      ),
+    })),
+
+  toggleStarMessage: (messageId) =>
+    set((s) => ({
+      messages: s.messages.map((x) => (x.id === messageId ? { ...x, starred: !x.starred } : x)),
+    })),
+
+  togglePinMessage: (messageId) => {
+    const message = get().messages.find((item) => item.id === messageId);
+    if (!message) return false;
+    if (message.pinned) {
+      set((s) => ({ messages: s.messages.map((x) => x.id === messageId ? { ...x, pinned: false } : x) }));
+      return true;
+    }
+    const pinnedCount = get().messages.filter((item) => item.chatId === message.chatId && item.pinned).length;
+    if (pinnedCount >= 3) return false;
+    set((s) => ({ messages: s.messages.map((x) => x.id === messageId ? { ...x, pinned: true } : x) }));
+    return true;
+  },
+
   markMessagesRead: (chatId) =>
     set((s) => ({
       messages: s.messages.map((x) =>
@@ -369,6 +402,22 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
 
   setWhisperUnlocked: (chatId, v) =>
     set((s) => ({ whisperUnlocked: { ...s.whisperUnlocked, [chatId]: v } })),
+
+  startWhisperSession: (chatId) =>
+    set((s) => ({ whisperSessions: { ...s.whisperSessions, [chatId]: uid('whisper') } })),
+
+  finishWhisperSession: (chatId, choice) =>
+    set((s) => ({
+      messages: choice === 'delete'
+        ? s.messages.filter((message) => message.chatId !== chatId || !message.whisperSessionId)
+        : s.messages.map((message) =>
+            message.chatId === chatId && message.whisperSessionId
+              ? { ...message, hidden: choice === 'hide' ? true : false, whisperSessionId: undefined }
+              : message,
+          ),
+      whisperUnlocked: { ...s.whisperUnlocked, [chatId]: false },
+      whisperSessions: Object.fromEntries(Object.entries(s.whisperSessions).filter(([id]) => id !== chatId)),
+    })),
 
   createThread: (chatId, rootMessageId, title) => {
     const id = uid('t');
@@ -423,6 +472,7 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
       messages: [],
       threads: [],
       whisperUnlocked: {},
+      whisperSessions: {},
       authDraft: { ...emptyDraft },
     });
   },
@@ -439,6 +489,7 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
     threads: state.threads,
     liteMode: state.liteMode,
     whisperUnlocked: state.whisperUnlocked,
+    whisperSessions: state.whisperSessions,
     authDraft: { ...emptyDraft },
   }),
 }));

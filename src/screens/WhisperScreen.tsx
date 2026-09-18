@@ -7,6 +7,7 @@ import { spacing, typeScale } from '../theme/tokens';
 import { useStore, visibleMessages } from '../store/useStore';
 import { TButton } from '../components/TButton';
 import { AmbientBackground } from '../components/AmbientBackground';
+import { glassEdge } from '../components/GlassView';
 import { IconButton } from '../components/icons';
 import { haptic } from '../lib/haptics';
 
@@ -14,10 +15,13 @@ import { haptic } from '../lib/haptics';
 // excluded from previews/search/notifications. Local-only, silent.
 export function WhisperScreen({ route, navigation }: any) {
   const { chatId } = route.params as { chatId: string };
-  const { palette } = useTheme();
+  const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const messages = useStore((s) => s.messages);
   const unlocked = useStore((s) => !!s.whisperUnlocked[chatId]);
   const setUnlocked = useStore((s) => s.setWhisperUnlocked);
+  const startSession = useStore((s) => s.startWhisperSession);
+  const finishSession = useStore((s) => s.finishWhisperSession);
   const unhide = useStore((s) => s.unhideMessage);
   const [busy, setBusy] = useState(false);
 
@@ -36,6 +40,7 @@ export function WhisperScreen({ route, navigation }: any) {
         if (res.success) {
           haptic.whisperUnlock();
           setUnlocked(chatId, true);
+          startSession(chatId);
         } else {
           haptic.whisperFail();
           Alert.alert('Not unlocked', 'Biometric check did not succeed.');
@@ -43,9 +48,11 @@ export function WhisperScreen({ route, navigation }: any) {
       } else {
         // Simulator / no biometrics: PIN-less demo unlock (Phase 1).
         setUnlocked(chatId, true);
+        startSession(chatId);
       }
     } catch {
       setUnlocked(chatId, true);
+      startSession(chatId);
     } finally {
       setBusy(false);
     }
@@ -95,7 +102,7 @@ export function WhisperScreen({ route, navigation }: any) {
         </Text>
       ) : (
         hidden.map((m) => (
-          <View key={m.id} style={[styles.card, { backgroundColor: palette.bgSurface }]}>
+          <View key={m.id} style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
             <Text style={{ color: palette.textPrimary }}>{m.text}</Text>
             <Pressable onPress={() => unhide(m.id)}>
               <Text style={[styles.unhide, { color: palette.textSecondary }]}>Unhide</Text>
@@ -103,7 +110,16 @@ export function WhisperScreen({ route, navigation }: any) {
           </View>
         ))
       )}
-      <TButton title="Lock Whisper" variant="ghost" onPress={() => setUnlocked(chatId, false)} />
+      <TButton
+        title="Finish Whisper session"
+        variant="ghost"
+        onPress={() => Alert.alert('Finish Whisper session', 'What should happen to messages from this session?', [
+          { text: 'Keep in chat', onPress: () => finishSession(chatId, 'keep') },
+          { text: 'Hide in Whisper lock', onPress: () => finishSession(chatId, 'hide') },
+          { text: 'Delete session', style: 'destructive', onPress: () => finishSession(chatId, 'delete') },
+          { text: 'Cancel', style: 'cancel' },
+        ])}
+      />
       </ScrollView>
       </AmbientBackground>
     </SafeAreaView>
@@ -120,7 +136,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   root: { flex: 1 },
   scroll: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
-  title: { fontSize: typeScale.title.size, fontWeight: '600' },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
   body: { fontSize: typeScale.body.size, lineHeight: typeScale.body.lineHeight },
   card: { padding: spacing.md, borderRadius: 16, gap: 8 },
   unhide: { fontSize: typeScale.caption.size },

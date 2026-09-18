@@ -40,6 +40,9 @@ export function ConversationScreen({ route, navigation }: any) {
   const send = useStore((s) => s.sendMessage);
   const editMsg = useStore((s) => s.editMessage);
   const deleteMsg = useStore((s) => s.deleteMessage);
+  const deleteEveryone = useStore((s) => s.deleteMessageForEveryone);
+  const toggleStar = useStore((s) => s.toggleStarMessage);
+  const togglePin = useStore((s) => s.togglePinMessage);
   const toggleReaction = useStore((s) => s.toggleReaction);
   const hide = useStore((s) => s.hideMessage);
   const createThread = useStore((s) => s.createThread);
@@ -54,6 +57,7 @@ export function ConversationScreen({ route, navigation }: any) {
     () => visibleMessages(all.filter((m) => m.chatId === chatId), whisperOpen),
     [all, chatId, whisperOpen],
   );
+  const pinned = useMemo(() => msgs.filter((message) => message.pinned).slice(0, 3), [msgs]);
   const byId = useMemo(() => new Map(msgs.map((m) => [m.id, m])), [msgs]);
 
   const [draft, setDraft] = useState('');
@@ -175,6 +179,18 @@ export function ConversationScreen({ route, navigation }: any) {
             onPress={() => navigation.navigate('Whisper', { chatId })}
           />
         </BlurView>
+
+        {pinned.length > 0 ? (
+          <View style={[styles.pinnedBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
+            <Icon name="pin" size={15} color={palette.ember} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.pinnedLabel, { color: palette.ember }]}>Pinned messages</Text>
+              <Text style={[styles.pinnedText, { color: palette.textSecondary }]} numberOfLines={1}>
+                {pinned[0].text}{pinned.length > 1 ? `  +${pinned.length - 1}` : ''}
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Messages — chronological, anchored top, grows down, native scrollbar */}
         <FlatList
@@ -404,6 +420,19 @@ export function ConversationScreen({ route, navigation }: any) {
                 })
               }
             />
+            <SheetRow
+              name="star"
+              label={menuMsg?.starred ? 'Remove star' : 'Star message'}
+              onPress={() => sheetAction(() => menuFor && toggleStar(menuFor))}
+            />
+            <SheetRow
+              name="pin"
+              label={menuMsg?.pinned ? 'Unpin message' : 'Pin message'}
+              onPress={() => sheetAction(() => {
+                if (!menuFor) return;
+                if (!togglePin(menuFor)) Alert.alert('Pin limit reached', 'You can pin up to 3 messages in a chat.');
+              })}
+            />
             {menuMsg?.mine ? (
               <SheetRow
                 name="edit"
@@ -445,10 +474,18 @@ export function ConversationScreen({ route, navigation }: any) {
               />
             <SheetRow
               name="trash"
-              label="Delete"
+              label="Delete for me"
               danger
               onPress={() => sheetAction(() => menuFor && deleteMsg(menuFor))}
             />
+            {menuMsg?.mine ? (
+              <SheetRow
+                name="trash"
+                label="Delete for everyone"
+                danger
+                onPress={() => sheetAction(() => menuFor && deleteEveryone(menuFor))}
+              />
+            ) : null}
             </GlassView>
           </Pressable>
         </Modal>
@@ -495,6 +532,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
+  pinnedBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 8, padding: 10, borderRadius: 12, borderWidth: 1 },
+  pinnedLabel: { fontSize: 11, fontWeight: '700' },
+  pinnedText: { fontSize: 12, marginTop: 2 },
   back: { fontSize: 28, paddingHorizontal: 4 },
   avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: typeScale.body.size, fontWeight: '700' },

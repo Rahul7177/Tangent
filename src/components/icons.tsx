@@ -23,7 +23,9 @@ export type IconName =
   | 'check'
   | 'doubleCheck'
   | 'clock'
-  | 'shield';
+  | 'shield'
+  | 'pin'
+  | 'star';
 
 // Single custom line-icon set: 24×24 viewBox, 1.8 stroke, round caps.
 // One geometry language everywhere keeps buttons/icons symmetric by construction.
@@ -93,6 +95,8 @@ export function Icon({
         </>
       )}
       {name === 'shield' && <Path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" {...p} />}
+      {name === 'pin' && <Path d="M8 4h8M9 4v6l-3 3h12l-3-3V4M12 13v8" {...p} />}
+      {name === 'star' && <Path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" {...p} />}
       {name === 'reply' && (
         <>
           <Polyline points="9 14 4 9 9 4" {...p} />
