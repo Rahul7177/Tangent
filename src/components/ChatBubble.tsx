@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChatMessage } from '../lib/types';
 import { useTheme } from '../theme/ThemeContext';
@@ -30,6 +30,7 @@ export function ChatBubble({
   onTapReaction,
 }: Props) {
   const { palette, mode } = useTheme();
+  const nativeDriver = Platform.OS !== 'web';
   const mine = msg.mine;
   const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
 
@@ -41,9 +42,9 @@ export function ChatBubble({
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(enterFade, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(enterScale, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(enterDy, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(enterFade, { toValue: 1, duration: 180, useNativeDriver: nativeDriver }),
+      Animated.timing(enterScale, { toValue: 1, duration: 180, useNativeDriver: nativeDriver }),
+      Animated.timing(enterDy, { toValue: 0, duration: 180, useNativeDriver: nativeDriver }),
     ]).start();
   }, [enterFade, enterScale, enterDy]);
 
@@ -65,17 +66,25 @@ export function ChatBubble({
       },
       onPanResponderRelease: () => {
         replied.current = false;
-        Animated.timing(dragX, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        Animated.timing(dragX, { toValue: 0, duration: 200, useNativeDriver: nativeDriver }).start();
       },
       onPanResponderTerminate: () => {
         replied.current = false;
-        Animated.timing(dragX, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+        Animated.timing(dragX, { toValue: 0, duration: 200, useNativeDriver: nativeDriver }).start();
       },
     }),
   ).current;
 
-  const dragMag = dragX.interpolate({ inputRange: mine ? [-72, -8] : [8, 72], outputRange: [72, 8], extrapolate: 'clamp' });
-  const iconOpacity = dragMag.interpolate({ inputRange: [8, 48], outputRange: [0, 1], extrapolate: 'clamp' });
+  const dragDistance = dragX.interpolate({
+    inputRange: mine ? [-72, 0] : [0, 72],
+    outputRange: [72, 0],
+    extrapolate: 'clamp',
+  });
+  const iconOpacity = dragDistance.interpolate({
+    inputRange: [20, 52],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   const senderGrad = gradients[mode].sender;
   // Own bubble is saturated mint (like the reference) → deep-pine ink on top.

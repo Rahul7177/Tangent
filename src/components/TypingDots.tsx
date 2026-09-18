@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { Animated, StyleSheet, View } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
 // Typing indicator: three dots, staggered opacity pulse, 1.4s loop. No haptics.
 export function TypingDots() {
+  const nativeDriver = Platform.OS !== 'web';
   const { palette } = useTheme();
   const a = useRef(new Animated.Value(0.3)).current;
   const b = useRef(new Animated.Value(0.3)).current;
@@ -14,8 +16,8 @@ export function TypingDots() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(v, { toValue: 1, duration: 350, useNativeDriver: true }),
-          Animated.timing(v, { toValue: 0.3, duration: 350, useNativeDriver: true }),
+          Animated.timing(v, { toValue: 1, duration: 350, useNativeDriver: nativeDriver }),
+          Animated.timing(v, { toValue: 0.3, duration: 350, useNativeDriver: nativeDriver }),
         ]),
       );
     const l1 = loop(a, 0);

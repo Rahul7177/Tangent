@@ -204,7 +204,6 @@ export function publishRealtime(payload: { type: 'message'; to: string; text: st
     reactions: [],
   };
   if (payload.replyToId) message.replyToId = payload.replyToId;
-  void set(messageRef, message).catch((error) => console.warn('Message archive failed:', error));
   void set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to })
     .catch((error) => console.warn('Message delivery failed:', error));
 }
