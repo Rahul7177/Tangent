@@ -31,6 +31,7 @@ export function ChatBubble({
 }: Props) {
   const { palette, mode } = useTheme();
   const mine = msg.mine;
+  const reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
 
   const enterFade = useRef(new Animated.Value(0)).current;
   const enterScale = useRef(new Animated.Value(0.96)).current;
@@ -90,7 +91,7 @@ export function ChatBubble({
         </Text>
       ) : null}
       {replyToText ? (
-        <View style={[styles.quote, { backgroundColor: mine ? 'rgba(3,37,27,0.10)' : 'rgba(0,0,0,0.06)' }]}>
+        <View style={[styles.quote, { backgroundColor: mine ? 'rgba(255,255,255,0.25)' : mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
           <View style={[styles.quoteBar, { backgroundColor: mine ? palette.onAccent : palette.ember }]} />
           <View style={styles.quoteBody}>
             {replyToSender ? (
@@ -144,16 +145,26 @@ export function ChatBubble({
                 {body}
               </LinearGradient>
             ) : (
-              <View style={[styles.bubble, styles.theirsRadius, { backgroundColor: palette.bgSurface }]}>
+              <View
+                style={[
+                  styles.bubble,
+                  styles.theirsRadius,
+                  {
+                    backgroundColor: palette.bgSurface,
+                    borderColor: palette.glassBorder,
+                    borderWidth: 1,
+                  },
+                ]}
+              >
                 {body}
               </View>
             )}
           </Pressable>
-          {msg.reactions.length > 0 ? (
+          {reactions.length > 0 ? (
             <Pressable
               onPress={() => {
                 haptic.reaction();
-                onTapReaction(msg.reactions[0].emoji);
+                onTapReaction(reactions[0].emoji);
               }}
               style={[
                 styles.reactionPill,
@@ -164,7 +175,7 @@ export function ChatBubble({
                 },
               ]}
             >
-              <Text style={{ fontSize: 12 }}>{msg.reactions.map((r) => r.emoji).join(' ')}</Text>
+              <Text style={{ fontSize: 12 }}>{reactions.map((r) => r.emoji).join(' ')}</Text>
             </Pressable>
           ) : null}
         </Animated.View>
@@ -194,8 +205,8 @@ const styles = StyleSheet.create({
   bubbleWrap: { maxWidth: '82%', minWidth: 96, flexShrink: 1 },
   bubble: {
     borderRadius: radius.bubble,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     minWidth: 96,
   },
   mineRadius: { borderTopRightRadius: 4 },

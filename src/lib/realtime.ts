@@ -113,7 +113,19 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   }));
   await set(ref(database, `presence/${username}`), true);
   detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
-    const message = snapshot.val() as ChatMessage;
+    const raw = snapshot.val() as Partial<ChatMessage>;
+    const message: ChatMessage = {
+      id: raw.id ?? snapshot.key ?? `msg-${Date.now()}`,
+      chatId: raw.chatId ?? '',
+      sender: raw.sender ?? 'unknown',
+      mine: false,
+      kind: raw.kind ?? 'text',
+      text: raw.text ?? '',
+      createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+      receipt: raw.receipt ?? 'delivered',
+      replyToId: raw.replyToId,
+      reactions: Array.isArray(raw.reactions) ? raw.reactions : [],
+    };
     if (message.sender !== username) emit({ type: 'message', message });
   }));
   detachRealtime.push(onChildAdded(ref(database, `requests/${username}`), (snapshot) => {
