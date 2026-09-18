@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -20,11 +20,11 @@ import { useStore } from '../store/useStore';
 import { isValidUsername } from '../lib/types';
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/realtime';
 
-type Flow = 'welcome' | 'account' | 'profile' | 'contact' | 'verify';
+type Flow = 'welcome' | 'account' | 'profile';
 type AuthMode = 'signup' | 'login';
 
-const signupSteps: Flow[] = ['account', 'profile', 'contact', 'verify'];
-const loginSteps: Flow[] = ['account', 'contact', 'verify'];
+const signupSteps: Flow[] = ['account', 'profile'];
+const loginSteps: Flow[] = ['account'];
 
 export function OnboardingScreen() {
   const { palette, mode } = useTheme();
@@ -36,8 +36,7 @@ export function OnboardingScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [phone] = useState('');
   const [error, setError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
 
@@ -47,15 +46,6 @@ export function OnboardingScreen() {
   const progress = flow === 'welcome' ? 0 : (stepIndex + 1) / currentSteps.length;
   const isLogin = authMode === 'login';
   const isDark = mode === 'dark';
-
-  const fieldStyle = useMemo(
-    () => ({
-      color: palette.textPrimary,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)',
-      borderColor: error ? palette.bad : isDark ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent',
-    }),
-    [error, isDark, palette],
-  );
 
   const goTo = (next: Flow) => {
     setError('');
@@ -85,13 +75,15 @@ export function OnboardingScreen() {
       setError('Add your name so people know it is you.');
       return false;
     }
-    if (flow === 'contact' && phone.replace(/\D/g, '').length < 7) {
-      setError('Enter a valid phone number to continue.');
-      return false;
-    }
-    if (flow === 'verify' && code.trim().length < 4) {
-      setError('Enter the 6-digit code we sent you.');
-      return false;
+    if (flow === 'profile') {
+      if (!usernameValue || !isValidUsername(usernameValue)) {
+        setError('Choose a handle with 3-24 lowercase characters, numbers, dots, dashes or underscores.');
+        return false;
+      }
+      if (taken(usernameValue)) {
+        setError('That handle is already taken. Try another one.');
+        return false;
+      }
     }
     return true;
   };
@@ -103,7 +95,11 @@ export function OnboardingScreen() {
       try {
         if (isLogin) await signInWithEmail(email, password);
         else await signUpWithEmail(email, password);
-        goTo(currentSteps[stepIndex + 1]);
+        if (isLogin) {
+          complete(name.trim() || email.split('@')[0] || 'You', usernameValue, phone);
+        } else {
+          goTo(currentSteps[stepIndex + 1]);
+        }
       } catch (authError: any) {
         const code = String(authError?.code ?? '');
         setError(code.includes('email-already-in-use') ? 'That email is already registered. Try Log in.' : code.includes('invalid-credential') ? 'Email or password is incorrect.' : 'We could not complete authentication. Check your connection and try again.');
@@ -112,7 +108,7 @@ export function OnboardingScreen() {
       }
       return;
     }
-    if (flow === 'verify') {
+    if (flow === 'profile') {
       complete(name.trim() || 'You', usernameValue, phone);
       return;
     }
@@ -125,7 +121,7 @@ export function OnboardingScreen() {
     setError('');
     try {
       await signInWithGoogle();
-      goTo(isLogin ? 'contact' : 'profile');
+      goTo('profile');
     } catch {
       setError('Google sign-in was cancelled or could not be completed.');
     } finally {
@@ -178,16 +174,11 @@ export function OnboardingScreen() {
                     <AccountStep palette={palette} mode={mode} authMode={authMode} username={username} setUsername={setUsername} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onGoogle={googleAuth} />
                   ) : null}
                   {flow === 'profile' ? (
-                    <ProfileStep palette={palette} name={name} setName={setName} />
+                    <ProfileStep palette={palette} name={name} setName={setName} username={username} setUsername={setUsername} />
                   ) : null}
-                  {flow === 'contact' ? (
-                    <ContactStep palette={palette} phone={phone} setPhone={setPhone} authMode={authMode} />
-                  ) : null}
-                  {flow === 'verify' ? (
-                    <VerifyStep palette={palette} phone={phone} code={code} setCode={setCode} />
-                  ) : null}
+                  {flow === 'profile' ? null : null}
                   {error ? <Text style={[styles.error, { color: palette.bad }]}>{error}</Text> : null}
-                  <TButton title={authBusy ? 'Connecting…' : flow === 'verify' ? 'Enter Tangent' : 'Continue'} onPress={() => void next()} />
+                  <TButton title={authBusy ? 'Connecting…' : flow === 'profile' ? 'Enter Tangent' : isLogin ? 'Log in' : 'Continue'} onPress={() => void next()} />
                   {flow === 'account' ? (
                     <Pressable onPress={() => startAuth(isLogin ? 'signup' : 'login')} style={styles.switchMode}>
                       <Text style={[styles.switchText, { color: palette.textSecondary }]}>
@@ -246,10 +237,10 @@ function AccountStep({ palette, mode, authMode, username, setUsername, email, se
   return (
     <>
       <Text style={[styles.formTitle, { color: palette.textPrimary }]}>{authMode === 'login' ? 'Good to see you.' : 'Your identity, your way.'}</Text>
-      <Text style={[styles.formBody, { color: palette.textSecondary }]}>{authMode === 'login' ? 'Enter your Tangent username to pick up where you left off.' : 'Choose a username people can use to find you. No phone number required to connect.'}</Text>
+      <Text style={[styles.formBody, { color: palette.textSecondary }]}>{authMode === 'login' ? 'Sign in with the email and password you used for Tangent.' : 'Create your account, then choose the handle your friends can search.'}</Text>
       <FieldLabel text="USERNAME" palette={palette} />
       <TextInput value={username} onChangeText={(value) => setUsername(value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))} placeholder="your.name" autoCapitalize="none" autoCorrect={false} placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent' }]} autoFocus />
-      <Text style={[styles.inputHint, { color: palette.textSecondary }]}>Lowercase letters, numbers, . _ -</Text>
+      <Text style={[styles.inputHint, { color: palette.textSecondary }]}>{authMode === 'login' ? 'Your Tangent username' : 'Lowercase letters, numbers, . _ -'}</Text>
       <FieldLabel text="EMAIL" palette={palette} />
       <TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.78)', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.10)' : palette.hairline ?? 'transparent' }]} />
       <FieldLabel text="PASSWORD" palette={palette} />
@@ -259,37 +250,16 @@ function AccountStep({ palette, mode, authMode, username, setUsername, email, se
   );
 }
 
-function ProfileStep({ palette, name, setName }: { palette: ReturnType<typeof useTheme>['palette']; name: string; setName: (value: string) => void }) {
+function ProfileStep({ palette, name, setName, username, setUsername }: { palette: ReturnType<typeof useTheme>['palette']; name: string; setName: (value: string) => void; username: string; setUsername: (value: string) => void }) {
   return (
     <>
       <Text style={[styles.formTitle, { color: palette.textPrimary }]}>What should we call you?</Text>
       <Text style={[styles.formBody, { color: palette.textSecondary }]}>Your display name is what friends will see in their chats.</Text>
       <FieldLabel text="DISPLAY NAME" palette={palette} />
       <TextInput value={name} onChangeText={setName} placeholder="Maya Singh" placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: palette.glass, borderColor: palette.hairline ?? 'transparent' }]} autoFocus />
-    </>
-  );
-}
-
-function ContactStep({ palette, phone, setPhone, authMode }: { palette: ReturnType<typeof useTheme>['palette']; phone: string; setPhone: (value: string) => void; authMode: AuthMode }) {
-  return (
-    <>
-      <Text style={[styles.formTitle, { color: palette.textPrimary }]}>{authMode === 'login' ? 'One quick check.' : 'Add a recovery number.'}</Text>
-      <Text style={[styles.formBody, { color: palette.textSecondary }]}>We will send a one-time code to confirm this number. It stays private.</Text>
-      <FieldLabel text="PHONE NUMBER" palette={palette} />
-      <TextInput value={phone} onChangeText={setPhone} placeholder="+1 555 012 3456" keyboardType="phone-pad" placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: palette.glass, borderColor: palette.hairline ?? 'transparent' }]} autoFocus />
-      <View style={styles.privateNote}><Icon name="lock" size={15} color={palette.ember} /><Text style={[styles.inputHint, { color: palette.textSecondary }]}>Only used for account security</Text></View>
-    </>
-  );
-}
-
-function VerifyStep({ palette, phone, code, setCode }: { palette: ReturnType<typeof useTheme>['palette']; phone: string; code: string; setCode: (value: string) => void }) {
-  return (
-    <>
-      <Text style={[styles.formTitle, { color: palette.textPrimary }]}>Check your messages.</Text>
-      <Text style={[styles.formBody, { color: palette.textSecondary }]}>We sent a 6-digit confirmation code to {phone || 'your phone'}.</Text>
-      <FieldLabel text="CONFIRMATION CODE" palette={palette} />
-      <TextInput value={code} onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" keyboardType="number-pad" placeholderTextColor={palette.textSecondary} style={[styles.input, styles.codeInput, { color: palette.textPrimary, backgroundColor: palette.glass, borderColor: palette.hairline ?? 'transparent' }]} autoFocus maxLength={6} />
-      <Pressable><Text style={[styles.resend, { color: palette.ember }]}>Resend code</Text></Pressable>
+      <FieldLabel text="TANGENT HANDLE" palette={palette} />
+      <TextInput value={username} onChangeText={(value) => setUsername(value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))} placeholder="maya_on_wire" autoCapitalize="none" autoCorrect={false} placeholderTextColor={palette.textSecondary} style={[styles.input, { color: palette.textPrimary, backgroundColor: palette.glass, borderColor: palette.hairline ?? 'transparent' }]} />
+      <Text style={[styles.inputHint, { color: palette.textSecondary }]}>Friends can find you with this handle.</Text>
     </>
   );
 }
