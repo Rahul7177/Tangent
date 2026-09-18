@@ -30,36 +30,22 @@ Web preview (for quick checks on this PC):
 npx expo start --web
 ```
 
-## Realtime chat relay
+## Realtime chat with Firebase
 
-The app can connect to the included lightweight WebSocket relay for real cross-device text chat.
-Run it from the `app` directory:
+Tangent uses Firebase Authentication and Realtime Database directly from the Expo client. No
+server or payment card is required for the Firebase Spark plan.
 
-```bash
-npm run server
-npx expo start --web
-```
+1. Create a Firebase project at https://console.firebase.google.com.
+2. Add a Web app in **Project settings → Your apps**.
+3. Enable **Authentication → Sign-in method → Anonymous**.
+4. Create a **Realtime Database** in the region closest to your users.
+5. In **Realtime Database → Rules**, paste the contents of `database.rules.json` and publish.
+6. Copy `.env.example` to `.env.local` and fill it with the Web app config values.
+7. Start the app with `npx expo start --web` or build it with EAS.
 
-For a hosted relay, set `EXPO_PUBLIC_TANGENT_WS_URL` to its `wss://` URL before starting Expo.
-The relay stores users and messages in PostgreSQL. The schema is in `server/schema.sql`; the
-relay runs it automatically at startup. Users should choose unique usernames during onboarding,
-then add each other from **Add people** before chatting.
-
-## Deploy the relay on Render
-
-The repository includes `render.yaml`, which creates a Render web service and a PostgreSQL
-database together:
-
-1. Push this repository to GitHub.
-2. In Render, choose **New → Blueprint** and select the repository.
-3. Confirm the `tangent-relay` service and `tangent-db` database from `render.yaml`.
-4. Deploy the Blueprint. Render supplies `DATABASE_URL` to the relay automatically.
-5. Copy the deployed service URL, for example `https://tangent-relay.onrender.com`.
-6. Set `EXPO_PUBLIC_TANGENT_WS_URL` to `wss://tangent-relay.onrender.com` before building or starting Expo.
-
-The relay exposes `GET /` as a health endpoint. PostgreSQL is initialized automatically, and the
-service refuses to start when `DATABASE_URL` is missing so it cannot accidentally run without
-persistent storage.
+The Firebase web config is safe to include in the client bundle. The database rules and Firebase
+Authentication are the security boundary; do not put service-account JSON or private keys in the
+Expo app. Firebase stores users, presence, inbox messages, and conversation messages persistently.
 
 EAS build when you want an APK/IPA:
 

@@ -131,7 +131,9 @@ export const useStore = create<TangentState>((set, get) => ({
         }
       });
     }
-    connectRealtime(cleanName, uname);
+    void connectRealtime(cleanName, uname, phone.trim()).catch((error: unknown) => {
+      console.warn('Firebase realtime is unavailable:', error);
+    });
   },
 
   usernameTaken: (username) => {
