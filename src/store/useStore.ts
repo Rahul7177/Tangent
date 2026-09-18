@@ -5,8 +5,11 @@ import {
   publishRealtime,
   publishRequest,
   publishRequestAccepted,
+  signOutRealtime,
   subscribeRealtime,
 } from '../lib/realtime';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface CurrentUser {
   name: string;
@@ -58,6 +61,7 @@ interface TangentState {
   replyInThread: (threadId: string, text: string) => void;
   setLiteMode: (v: boolean) => void;
   markRead: (chatId: string) => void;
+  logout: () => Promise<void>;
 }
 
 // Offline-first stub (PRD Module 1 + 5):
@@ -74,7 +78,7 @@ function directChatId(a: string, b: string) {
 
 let realtimeBound = false;
 
-export const useStore = create<TangentState>((set, get) => ({
+export const useStore = create<TangentState>()(persist((set, get) => ({
   onboarded: false,
   userName: '',
   currentUser: { name: 'You', username: 'you', phone: '' },
@@ -406,6 +410,37 @@ export const useStore = create<TangentState>((set, get) => ({
     set((s) => ({
       chats: s.chats.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c)),
     })),
+
+  logout: async () => {
+    await signOutRealtime().catch((error) => console.warn('Logout failed:', error));
+    realtimeBound = false;
+    set({
+      onboarded: false,
+      userName: '',
+      currentUser: { name: 'You', username: 'you', phone: '' },
+      directory: [],
+      chats: [],
+      messages: [],
+      threads: [],
+      whisperUnlocked: {},
+      authDraft: { ...emptyDraft },
+    });
+  },
+}), {
+  name: 'tangent-session',
+  storage: createJSONStorage(() => AsyncStorage),
+  partialize: (state) => ({
+    onboarded: state.onboarded,
+    userName: state.userName,
+    currentUser: state.currentUser,
+    directory: state.directory,
+    chats: state.chats,
+    messages: state.messages,
+    threads: state.threads,
+    liteMode: state.liteMode,
+    whisperUnlocked: state.whisperUnlocked,
+    authDraft: { ...emptyDraft },
+  }),
 }));
 
 export function visibleMessages(messages: ChatMessage[], whisperOpen: boolean) {

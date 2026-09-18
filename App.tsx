@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { useStore } from './src/store/useStore';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 // Fonts per tangent_design.md §2: Cabinet Grotesk + General Sans (Fontshare) +
@@ -16,6 +17,16 @@ async function loadFonts() {
 
 function Shell() {
   const { mode } = useTheme();
+  const onboarded = useStore((s) => s.onboarded);
+  const currentUser = useStore((s) => s.currentUser);
+  const completeOnboarding = useStore((s) => s.completeOnboarding);
+
+  useEffect(() => {
+    if (onboarded && currentUser.username && currentUser.username !== 'you') {
+      completeOnboarding(currentUser.name, currentUser.username, currentUser.phone);
+    }
+  }, [onboarded, currentUser.name, currentUser.phone, currentUser.username, completeOnboarding]);
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />

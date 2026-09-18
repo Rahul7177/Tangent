@@ -8,14 +8,18 @@ import { spacing, typeScale } from '../theme/tokens';
 import { useStore } from '../store/useStore';
 import { qrPayloadFor } from '../lib/types';
 import { AmbientBackground } from '../components/AmbientBackground';
+import { glassEdge } from '../components/GlassView';
 import { IconButton } from '../components/icons';
 import { TButton } from '../components/TButton';
 
 // Your public card: name, @username, phone + a QR that encodes
 // `tangent://add/<username>` for instant adds.
 export function ProfileScreen({ navigation }: any) {
-  const { palette } = useTheme();
+  const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const me = useStore((s) => s.currentUser);
+  const logout = useStore((s) => s.logout);
+
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.safe, { backgroundColor: palette.bgBase }]}>
@@ -33,7 +37,7 @@ export function ProfileScreen({ navigation }: any) {
         <Text style={[styles.title, { color: palette.textPrimary }]}>Profile</Text>
         <View style={{ width: 38 }} />
       </View>
-      <View style={[styles.card, { backgroundColor: palette.bgSurface }]}>
+      <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
         <View style={[styles.avatar, { backgroundColor: palette.bgRaised }]}>
           <Text style={[styles.letter, { color: palette.textPrimary }]}>
             {me.name.slice(0, 1).toUpperCase()}
@@ -48,19 +52,23 @@ export function ProfileScreen({ navigation }: any) {
           <Text style={[styles.copy, { color: palette.textSecondary }]}>Tap @username to copy</Text>
         </Pressable>
       </View>
-      <View style={[styles.card, { backgroundColor: palette.bgSurface, alignItems: 'center' }]}>
+      <View style={[styles.card, { backgroundColor: palette.bgSurface, alignItems: 'center' }, glassEdge(palette, dark)]}>
         <Text style={[styles.qrTitle, { color: palette.textPrimary }]}>My QR</Text>
         <Text style={[styles.qrSub, { color: palette.textSecondary }]}>
           Friends scan this to send you a message request
         </Text>
-        <QRCode
-          value={qrPayloadFor(me.username || 'you')}
-          size={200}
-          color={palette.textPrimary}
-          backgroundColor={palette.bgSurface}
-        />
+        {/* Opaque white tile keeps the code scannable over the mesh background */}
+        <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14 }}>
+          <QRCode
+            value={qrPayloadFor(me.username || 'you')}
+            size={200}
+            color="#0B1C2E"
+            backgroundColor="#FFFFFF"
+          />
+        </View>
       </View>
       <TButton title="Add people" onPress={() => navigation.navigate('AddContact')} />
+      <TButton title="Log out" variant="ghost" onPress={() => void logout()} />
       </View>
       </AmbientBackground>
     </SafeAreaView>

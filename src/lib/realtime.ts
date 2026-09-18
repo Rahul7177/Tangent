@@ -1,11 +1,11 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { Platform } from 'react-native';
 import {
-  browserSessionPersistence,
+  browserLocalPersistence,
   GoogleAuthProvider,
   browserPopupRedirectResolver,
   getAuth,
-  setPersistence,
+  signOut,
   signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -48,6 +48,7 @@ let username = '';
 let database: ReturnType<typeof getDatabase> | null = null;
 let connectedUsername = '';
 let detachRealtime: (() => void)[] = [];
+let authInstance: ReturnType<typeof getAuth> | null = null;
 
 export function firebaseReady() {
   return configured;
@@ -56,13 +57,27 @@ export function firebaseReady() {
 function firebaseAuth() {
   if (!configured) throw new Error('Firebase is not configured. Add the values from .env.local.');
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  return getAuth(app);
+  if (authInstance) return authInstance;
+  authInstance = getAuth(app);
+  return authInstance;
 }
 
 async function prepareAuth() {
   const auth = firebaseAuth();
-  if (Platform.OS === 'web') await setPersistence(auth, browserSessionPersistence);
+  if (Platform.OS === 'web') {
+    const { setPersistence } = await import('firebase/auth');
+    await setPersistence(auth, browserLocalPersistence);
+  }
   return auth;
+}
+
+export async function signOutRealtime() {
+  detachRealtime.forEach((detach) => detach());
+  detachRealtime = [];
+  connectedUsername = '';
+  username = '';
+  database = null;
+  await signOut(firebaseAuth());
 }
 
 export async function signUpWithEmail(email: string, password: string) {

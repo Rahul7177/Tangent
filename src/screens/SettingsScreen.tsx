@@ -5,15 +5,19 @@ import { useTheme } from '../theme/ThemeContext';
 import { spacing, typeScale } from '../theme/tokens';
 import { useStore } from '../store/useStore';
 import { AmbientBackground } from '../components/AmbientBackground';
+import { glassEdge } from '../components/GlassView';
 import { Icon } from '../components/icons';
 
 // Settings: theme toggle (200ms cross-fade, no haptic), Lite Mode (PRD 8.7),
 // privacy note, anti-slop lint reminder.
 export function SettingsScreen({ navigation }: any) {
   const { palette, mode, toggle } = useTheme();
+  const dark = mode === 'dark';
   const lite = useStore((s) => s.liteMode);
   const setLite = useStore((s) => s.setLiteMode);
   const me = useStore((s) => s.currentUser);
+  const logout = useStore((s) => s.logout);
+
 
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: palette.bgBase }]}>
@@ -23,7 +27,7 @@ export function SettingsScreen({ navigation }: any) {
 
       <Pressable
         onPress={() => navigation.navigate('Profile')}
-        style={[styles.card, styles.profileRow, { backgroundColor: palette.bgSurface }]}
+        style={[styles.card, styles.profileRow, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}
       >
         <View style={[styles.avatar, { backgroundColor: palette.ember }]}>
           <Text style={[styles.avatarLetter, { color: palette.onAccent }]}>{me.name.slice(0, 1).toUpperCase()}</Text>
@@ -35,7 +39,7 @@ export function SettingsScreen({ navigation }: any) {
         <Icon name="forward" size={18} color={palette.textSecondary} />
       </Pressable>
 
-      <View style={[styles.card, { backgroundColor: palette.bgSurface }]}>
+      <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
         <View style={styles.row}>
           <Text style={[styles.label, { color: palette.textPrimary }]}>Dark mode</Text>
           <Switch value={mode === 'dark'} onValueChange={toggle} />
@@ -51,7 +55,14 @@ export function SettingsScreen({ navigation }: any) {
         </View>
       </View>
 
-      <View style={[styles.card, { backgroundColor: palette.bgSurface }]}>
+      <Pressable
+        onPress={() => void logout()}
+        style={[styles.card, styles.logoutCard, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}
+      >
+        <Text style={[styles.logoutText, { color: palette.bad }]}>Log out</Text>
+      </Pressable>
+
+      <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
         <Text style={[styles.label, { color: palette.textPrimary }]}>Privacy</Text>
         <Text style={[styles.desc, { color: palette.textSecondary }]}>
           Whisper items stay encrypted on-device (SQLCipher in Phase 2) and never alter the other
@@ -77,11 +88,13 @@ const styles = StyleSheet.create({
   profileRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { fontWeight: '700', fontSize: 20 },
-  title: { fontSize: typeScale.title.size, fontWeight: '600' },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
   sub: { fontSize: typeScale.caption.size },
   card: { borderRadius: 16, padding: spacing.lg, gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   label: { fontSize: typeScale.body.size, fontWeight: '600' },
   desc: { fontSize: typeScale.caption.size, marginTop: 2 },
   lint: { fontSize: 11, lineHeight: 16 },
+  logoutCard: { alignItems: 'center' },
+  logoutText: { fontSize: typeScale.body.size, fontWeight: '700' },
 });
