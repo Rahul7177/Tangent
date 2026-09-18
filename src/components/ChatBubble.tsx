@@ -77,7 +77,7 @@ export function ChatBubble({
 
   const dragDistance = dragX.interpolate({
     inputRange: mine ? [-72, 0] : [0, 72],
-    outputRange: [72, 0],
+    outputRange: mine ? [72, 0] : [0, 72],
     extrapolate: 'clamp',
   });
   const iconOpacity = dragDistance.interpolate({
