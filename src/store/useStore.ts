@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { Chat, ChatMessage, DirectoryUser, TangentThread, isValidUsername } from '../lib/types';
-import { seedChats, seedDirectory, seedMessages } from '../data/seed';
-import { connectRealtime, publishRealtime, subscribeRealtime } from '../lib/realtime';
+import {
+  connectRealtime,
+  publishRealtime,
+  publishRequest,
+  publishRequestAccepted,
+  subscribeRealtime,
+} from '../lib/realtime';
 
 export interface CurrentUser {
   name: string;
@@ -73,18 +78,10 @@ export const useStore = create<TangentState>((set, get) => ({
   onboarded: false,
   userName: '',
   currentUser: { name: 'You', username: 'you', phone: '' },
-  directory: seedDirectory,
-  chats: seedChats,
-  messages: seedMessages,
-  threads: [
-    {
-      id: 't-1',
-      chatId: 'c-anya',
-      rootMessageId: 'msg-3',
-      title: 'Train stories',
-      messageIds: [],
-    },
-  ],
+  directory: [],
+  chats: [],
+  messages: [],
+  threads: [],
   liteMode: false,
   whisperUnlocked: {},
 
@@ -101,7 +98,7 @@ export const useStore = create<TangentState>((set, get) => ({
       realtimeBound = true;
       subscribeRealtime((event) => {
         if (event.type === 'directory') {
-          set((s) => ({ directory: event.users }));
+          set(() => ({ directory: event.users }));
           return;
         }
         if (event.type === 'presence') {
@@ -141,6 +138,43 @@ export const useStore = create<TangentState>((set, get) => ({
                 : [...s.chats, nextChat],
             };
           });
+        }
+        if (event.type === 'request') {
+          const sender = get().directory.find((user) => user.username === event.from);
+          const current = get().currentUser;
+          const chatId = directChatId(current.username, event.from);
+          set((s) =>
+            s.chats.some((chat) => chat.id === chatId)
+              ? s
+              : {
+                  chats: [
+                    ...s.chats,
+                    {
+                      id: chatId,
+                      name: sender?.name ?? event.from,
+                      isGroup: false,
+                      online: true,
+                      unread: 1,
+                      requestStatus: 'pending-received',
+                      username: event.from,
+                      phone: sender?.phone,
+                    },
+                  ],
+                },
+          );
+          return;
+        }
+        if (event.type === 'requestAccepted') {
+          const current = get().currentUser;
+          const chatId = directChatId(current.username, event.from);
+          set((s) => ({
+            chats: s.chats.map((chat) =>
+              chat.id === chatId
+                ? { ...chat, requestStatus: 'active' }
+                : chat,
+            ),
+          }));
+          return;
         }
       });
     }
@@ -198,20 +232,27 @@ export const useStore = create<TangentState>((set, get) => ({
       isGroup: false,
       online: false,
       unread: 0,
-      requestStatus: 'active',
+      requestStatus: 'pending-sent',
       username: user.username,
       phone: user.phone,
     };
     set((s) => ({ chats: [...s.chats, chat] }));
+    publishRequest({ type: 'request', id, to: user.username });
     return id;
   },
 
-  acceptRequest: (chatId) =>
+  acceptRequest: (chatId) => {
+    const chat = get().chats.find((item) => item.id === chatId);
+    if (!chat?.username) return;
     set((s) => ({
       chats: s.chats.map((c) =>
-        c.id === chatId ? { ...c, requestStatus: 'active', unread: 0 } : c,
+        c.id === chatId
+          ? { ...c, requestStatus: 'active', unread: 0 }
+          : c,
       ),
-    })),
+    }));
+    publishRequestAccepted({ id: chatId, to: chat.username });
+  },
 
   declineRequest: (chatId) =>
     set((s) => ({

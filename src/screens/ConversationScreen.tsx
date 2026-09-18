@@ -20,6 +20,7 @@ import { spacing, typeScale } from '../theme/tokens';
 import { useStore, visibleMessages } from '../store/useStore';
 import { ChatBubble } from '../components/ChatBubble';
 import { TypingDots } from '../components/TypingDots';
+import { GlassView, glassEdge } from '../components/GlassView';
 import { AmbientBackground } from '../components/AmbientBackground';
 import { Icon, IconButton, IconName, IconSlot } from '../components/icons';
 import { haptic } from '../lib/haptics';
@@ -33,10 +34,10 @@ const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '🙏', '👏'];
 export function ConversationScreen({ route, navigation }: any) {
   const { chatId } = route.params as { chatId: string };
   const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const chats = useStore((s) => s.chats);
   const all = useStore((s) => s.messages);
   const send = useStore((s) => s.sendMessage);
-  const receive = useStore((s) => s.receiveMessage);
   const editMsg = useStore((s) => s.editMessage);
   const deleteMsg = useStore((s) => s.deleteMessage);
   const toggleReaction = useStore((s) => s.toggleReaction);
@@ -60,15 +61,12 @@ export function ConversationScreen({ route, navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
     markRead(chatId);
     markMessagesRead(chatId);
   }, [chatId, msgs.length, markRead, markMessagesRead]);
-
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const scrollToEnd = () => {
     requestAnimationFrame(() => {
@@ -104,18 +102,6 @@ export function ConversationScreen({ route, navigation }: any) {
     setReplyTo(null);
     markRead(chatId);
     scrollToEnd();
-    // Demo liveliness for 1:1 chats: peer "reads" then types a short reply.
-    if (chat && !chat.isGroup) {
-      timers.current.push(
-        setTimeout(() => markMessagesRead(chatId), 1600),
-        setTimeout(() => setPeerTyping(true), 1800),
-        setTimeout(() => {
-          setPeerTyping(false);
-          receive(chatId, 'Nice — came through instantly even on my patchy signal 📶', chat.name);
-          markRead(chatId);
-        }, 3600),
-      );
-    }
   };
 
   const replyTarget = replyTo ? byId.get(replyTo) : undefined;
@@ -137,11 +123,11 @@ export function ConversationScreen({ route, navigation }: any) {
         style={styles.flex}
       >
       <AmbientBackground>
-        {/* Frosted header — floats over the ambient background like the reference */}
+        {/* Frosted header floating over the mesh canvas */}
         <BlurView
-          intensity={64}
-          tint={mode === 'dark' ? 'dark' : 'light'}
-          style={[styles.header, { backgroundColor: palette.glass }]}
+          intensity={50}
+          tint={dark ? 'dark' : 'light'}
+          style={[styles.header, { backgroundColor: palette.glass, borderBottomColor: palette.glassBorder, borderBottomWidth: 1 }]}
         >
           <IconButton
             name="back"
@@ -217,7 +203,7 @@ export function ConversationScreen({ route, navigation }: any) {
           }}
           ListHeaderComponent={
             <View style={{ alignItems: 'center', marginBottom: 8, gap: 6 }}>
-              <View style={[styles.dayPill, { backgroundColor: palette.bgRaised }]}>
+              <View style={[styles.dayPill, { backgroundColor: palette.bgRaised }, glassEdge(palette, dark)]}>
                 <Text style={[styles.dayText, { color: palette.textSecondary }]}>Today</Text>
               </View>
               <View style={styles.e2eRow}>
@@ -242,7 +228,7 @@ export function ConversationScreen({ route, navigation }: any) {
 
         {/* Message-request gate: no messaging until the receiver accepts */}
         {requestStatus === 'pending-received' ? (
-          <View style={[styles.requestBar, { backgroundColor: palette.bgSurface }]}>
+          <View style={[styles.requestBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
             <Text style={[styles.requestText, { color: palette.textPrimary }]}>
               {chat?.name} wants to message you. Accept to start chatting.
             </Text>
@@ -265,7 +251,7 @@ export function ConversationScreen({ route, navigation }: any) {
             </View>
           </View>
         ) : requestStatus === 'pending-sent' ? (
-          <View style={[styles.requestBar, { backgroundColor: palette.bgSurface }]}>
+          <View style={[styles.requestBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
             <Text style={[styles.requestText, { color: palette.textSecondary }]}>
               Request sent — you can start messaging once {chat?.name} accepts.
             </Text>
@@ -274,7 +260,7 @@ export function ConversationScreen({ route, navigation }: any) {
 
         {/* Reply / edit preview */}
         {!gated && replyTarget && !editingId ? (
-          <View style={[styles.quoteBar, { backgroundColor: palette.bgSurface }]}>
+          <View style={[styles.quoteBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
             <View style={[styles.quoteStripe, { backgroundColor: palette.ember }]} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.quoteName, { color: palette.ember }]}>
@@ -294,7 +280,7 @@ export function ConversationScreen({ route, navigation }: any) {
           </View>
         ) : null}
         {editingTarget && !gated ? (
-          <View style={[styles.quoteBar, { backgroundColor: palette.bgSurface }]}>
+          <View style={[styles.quoteBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
             <View style={[styles.quoteStripe, { backgroundColor: palette.ember }]} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.quoteName, { color: palette.ember }]}>Editing message</Text>
@@ -315,17 +301,16 @@ export function ConversationScreen({ route, navigation }: any) {
           </View>
         ) : null}
 
-        {/* Composer — frosted bar: attach / input / send|mic share one 44px
-            axis, floating over the ambient background */}
+        {/* Composer — frosted bar over the mesh */}
         {!gated ? (
         <BlurView
-          intensity={64}
-          tint={mode === 'dark' ? 'dark' : 'light'}
+          intensity={50}
+          tint={dark ? 'dark' : 'light'}
           style={[
             styles.composerBar,
             {
               backgroundColor: palette.glass,
-              borderTopColor: mode === 'dark' ? 'transparent' : palette.hairline ?? 'transparent',
+              borderTopColor: palette.glassBorder,
             },
           ]}
         >
@@ -336,10 +321,10 @@ export function ConversationScreen({ route, navigation }: any) {
             size={44}
             iconSize={22}
             color={palette.textSecondary}
-            backgroundColor={mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
+            backgroundColor={palette.bgSurface}
             onPress={() => Alert.alert('Attach', 'Photos, voice notes & GIFs land here in Phase 2.')}
           />
-          <View style={[styles.inputPill, { backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+          <View style={[styles.inputPill, { backgroundColor: palette.bgSurface }]}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -380,7 +365,7 @@ export function ConversationScreen({ route, navigation }: any) {
         {/* Long-press sheet — one simple list, no inline forms */}
         <Modal visible={!!menuFor} transparent animationType="fade" onRequestClose={() => setMenuFor(null)}>
           <Pressable style={styles.scrim} onPress={() => setMenuFor(null)}>
-            <View style={[styles.sheet, { backgroundColor: palette.bgSurface }]}>
+            <GlassView radius={24} intensity={60} style={styles.sheet}>
               <View style={styles.emojiRow}>
                 {QUICK_EMOJI.map((e) => (
                   <Pressable
@@ -464,7 +449,7 @@ export function ConversationScreen({ route, navigation }: any) {
               danger
               onPress={() => sheetAction(() => menuFor && deleteMsg(menuFor))}
             />
-            </View>
+            </GlassView>
           </Pressable>
         </Modal>
       </AmbientBackground>
@@ -550,7 +535,7 @@ const styles = StyleSheet.create({
   requestRow: { flexDirection: 'row', gap: 8 },
   requestBtn: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',

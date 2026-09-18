@@ -1,8 +1,11 @@
 import { initializeApp, getApps } from 'firebase/app';
+import { Platform } from 'react-native';
 import {
+  browserSessionPersistence,
   GoogleAuthProvider,
   browserPopupRedirectResolver,
   getAuth,
+  setPersistence,
   signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -23,7 +26,9 @@ import { ChatMessage, DirectoryUser } from './types';
 export type RealtimeEvent =
   | { type: 'message'; message: ChatMessage }
   | { type: 'directory'; users: DirectoryUser[] }
-  | { type: 'presence'; username: string; online: boolean };
+  | { type: 'presence'; username: string; online: boolean }
+  | { type: 'request'; id: string; from: string; to: string; createdAt: number }
+  | { type: 'requestAccepted'; id: string; from: string; to: string };
 
 type Listener = (event: RealtimeEvent) => void;
 
@@ -54,16 +59,22 @@ function firebaseAuth() {
   return getAuth(app);
 }
 
+async function prepareAuth() {
+  const auth = firebaseAuth();
+  if (Platform.OS === 'web') await setPersistence(auth, browserSessionPersistence);
+  return auth;
+}
+
 export async function signUpWithEmail(email: string, password: string) {
-  return createUserWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+  return createUserWithEmailAndPassword(await prepareAuth(), email.trim(), password);
 }
 
 export async function signInWithEmail(email: string, password: string) {
-  return signInWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+  return signInWithEmailAndPassword(await prepareAuth(), email.trim(), password);
 }
 
 export async function signInWithGoogle() {
-  const auth = firebaseAuth();
+  const auth = await prepareAuth();
   const provider = new GoogleAuthProvider();
   return signInWithPopup(auth, provider, browserPopupRedirectResolver);
 }
@@ -87,7 +98,7 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   if (connectedUsername === username && database) return;
   detachRealtime.forEach((detach) => detach());
   detachRealtime = [];
-  const auth = firebaseAuth();
+  const auth = await prepareAuth();
   if (!auth.currentUser) await signInAnonymously(auth);
   const app = getApps()[0];
   database = getDatabase(app);
@@ -104,6 +115,40 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
     const message = snapshot.val() as ChatMessage;
     if (message.sender !== username) emit({ type: 'message', message });
+  }));
+  detachRealtime.push(onChildAdded(ref(database, `requests/${username}`), (snapshot) => {
+    const request = snapshot.val() as {
+      id: string;
+      from: string;
+      to: string;
+      createdAt: number;
+      status: string;
+    };
+    if (request.status === 'pending') {
+      emit({
+        type: 'request',
+        id: request.id,
+        from: request.from,
+        to: request.to,
+        createdAt: request.createdAt,
+      });
+    }
+  }));
+  detachRealtime.push(onChildAdded(ref(database, `requestEvents/${username}`), (snapshot) => {
+    const event = snapshot.val() as {
+      id: string;
+      from: string;
+      to: string;
+      type: string;
+    };
+    if (event.type === 'accepted') {
+      emit({
+        type: 'requestAccepted',
+        id: event.id,
+        from: event.from,
+        to: event.to,
+      });
+    }
   }));
   connectedUsername = username;
 }
@@ -135,6 +180,31 @@ export function publishRealtime(payload: { type: 'message'; to: string; text: st
   void set(messageRef, message).catch((error) => console.warn('Message archive failed:', error));
   void set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to })
     .catch((error) => console.warn('Message delivery failed:', error));
+}
+
+export function publishRequest(payload: { type: 'request'; id: string; to: string }) {
+  if (!database || !username) return;
+  const activeDatabase = database;
+  const request = {
+    id: payload.id,
+    from: username,
+    to: payload.to,
+    createdAt: Date.now(),
+    status: 'pending',
+  };
+  void set(ref(activeDatabase, `requests/${payload.to}/${payload.id}`), request)
+    .then(() => set(ref(activeDatabase, `requestsOut/${username}/${payload.id}`), request))
+    .catch((error) => console.warn('Request failed:', error));
+}
+
+export function publishRequestAccepted(payload: { id: string; to: string }) {
+  if (!database || !username) return;
+  void set(ref(database, `requestEvents/${payload.to}/${payload.id}`), {
+    id: payload.id,
+    from: username,
+    to: payload.to,
+    type: 'accepted',
+  }).catch((error) => console.warn('Request acceptance failed:', error));
 }
 
 export function isRealtimeConfigured() {

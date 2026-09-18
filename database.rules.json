@@ -32,6 +32,33 @@
           ".validate": "newData.child('to').val() === $username && newData.child('senderUid').val() === auth.uid"
         }
       }
+    },
+    "requests": {
+      "$username": {
+        ".read": "auth != null && root.child('users').child($username).child('ownerId').val() === auth.uid",
+        "$requestId": {
+          ".write": "auth != null && !data.exists() && root.child('users').child(newData.child('from').val()).child('ownerId').val() === auth.uid && newData.child('to').val() === $username",
+          ".validate": "newData.hasChildren(['id', 'from', 'to', 'createdAt', 'status']) && newData.child('status').val() === 'pending'"
+        }
+      }
+    },
+    "requestsOut": {
+      "$username": {
+        ".read": "auth != null && root.child('users').child($username).child('ownerId').val() === auth.uid",
+        "$requestId": {
+          ".write": "auth != null && root.child('users').child($username).child('ownerId').val() === auth.uid",
+          ".validate": "newData.child('from').val() === $username"
+        }
+      }
+    },
+    "requestEvents": {
+      "$username": {
+        ".read": "auth != null && root.child('users').child($username).child('ownerId').val() === auth.uid",
+        "$requestId": {
+          ".write": "auth != null && root.child('users').child(newData.child('from').val()).child('ownerId').val() === auth.uid && newData.child('to').val() === $username",
+          ".validate": "newData.child('type').val() === 'accepted'"
+        }
+      }
     }
   }
 }
