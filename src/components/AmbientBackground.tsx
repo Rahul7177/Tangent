@@ -4,8 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 
-// Ambient background: neutral base + restrained blue atmosphere + film grain.
-// The accent remains reserved for controls and conversation states.
+// Ambient background: literal black/white canvas with restrained blue blooms and grain.
 
 // Fixed pseudo-random grain dots (stable across renders, no churn).
 const DOTS: [number, number, number, number][] = [
@@ -42,9 +41,9 @@ export function GrainOverlay({ opacity = 0.05 }: { opacity?: number }) {
 function AmbientWashes() {
   const { mode } = useTheme();
   const dark = mode === 'dark';
-  const top = dark ? 'rgba(92,164,233,0.18)' : 'rgba(122,197,233,0.20)';
-  const bottom = dark ? 'rgba(4,12,22,0.18)' : 'rgba(183,220,231,0.16)';
-  const side = dark ? 'rgba(47,102,158,0.14)' : 'rgba(151,211,232,0.15)';
+  const top = dark ? 'rgba(36,105,236,0.16)' : 'rgba(111,184,255,0.18)';
+  const bottom = dark ? 'rgba(20,57,125,0.12)' : 'rgba(159,211,255,0.14)';
+  const side = dark ? 'rgba(34,88,190,0.10)' : 'rgba(132,201,255,0.12)';
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient

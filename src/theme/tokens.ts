@@ -1,6 +1,5 @@
-// Tangent design tokens — airy ice glass in light mode, midnight glass in dark.
-// Blue is the functional accent; atmosphere comes from translucent layered color
-// washes and grain rather than opaque panels or neon effects.
+// Tangent design tokens — white/blue glass in light mode, black/blue glass in dark.
+// The canvas stays neutral; blue belongs to soft atmospheric blooms and actions.
 
 export const spacing = {
   xs: 4,
@@ -47,12 +46,12 @@ export interface Palette {
 }
 
 export const lightPalette: Palette = {
-  bgBase: '#EAF5FA',
-  bgSurface: 'rgba(255,255,255,0.62)',
-  bgRaised: 'rgba(255,255,255,0.78)',
-  textPrimary: '#10202B',
-  textSecondary: '#607583',
-  hairline: 'rgba(126,164,183,0.28)',
+  bgBase: '#FFFFFF',
+  bgSurface: 'rgba(255,255,255,0.58)',
+  bgRaised: 'rgba(255,255,255,0.76)',
+  textPrimary: '#080B10',
+  textSecondary: '#68717C',
+  hairline: 'rgba(100,116,136,0.22)',
   shadow: null,
   ember: '#2F7BFF',
   emberPressed: '#1E5FD3',
@@ -64,17 +63,17 @@ export const lightPalette: Palette = {
 };
 
 export const darkPalette: Palette = {
-  bgBase: '#0B1421',
-  bgSurface: 'rgba(24,38,55,0.68)',
-  bgRaised: 'rgba(55,76,98,0.56)',
-  textPrimary: '#F3F8FC',
-  textSecondary: '#A7BBC9',
+  bgBase: '#000000',
+  bgSurface: 'rgba(18,20,24,0.72)',
+  bgRaised: 'rgba(38,42,50,0.62)',
+  textPrimary: '#F7F9FC',
+  textSecondary: '#9EA7B3',
   hairline: null,
   shadow: '0 2px 12px rgba(0,0,0,0.35)',
   ember: '#65A3FF',
   emberPressed: '#3F83E8',
   onAccent: '#061326',
-  glass: 'rgba(15,29,44,0.54)',
+  glass: 'rgba(12,14,18,0.58)',
   good: '#6FA37E',
   weak: '#CBA354',
   bad: '#D26858',
@@ -87,14 +86,14 @@ export type GradientStop = [string, string];
 export const gradients: Record<ThemeMode, { primary: GradientStop; hero: GradientStop; card: GradientStop; sender: GradientStop }> = {
   light: {
     primary: ['#1E5FD3', '#65A3FF'],
-    hero: ['#F9FDFF', '#DDEFFA'],
-    card: ['rgba(255,255,255,0.82)', 'rgba(221,239,250,0.66)'],
+    hero: ['#FFFFFF', '#FFFFFF'],
+    card: ['rgba(255,255,255,0.76)', 'rgba(255,255,255,0.48)'],
     sender: ['#D8E7FF', '#BBD4FF'],
   },
   dark: {
     primary: ['#65A3FF', '#2F7BFF'],
-    hero: ['#0A1523', '#152D43'],
-    card: ['rgba(28,49,69,0.82)', 'rgba(12,25,39,0.72)'],
+    hero: ['#000000', '#000000'],
+    card: ['rgba(24,26,31,0.82)', 'rgba(8,9,12,0.72)'],
     sender: ['#5D99F5', '#2F6FD9'],
   },
 };
