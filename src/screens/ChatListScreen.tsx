@@ -7,6 +7,7 @@ import { useStore, visibleMessages } from '../store/useStore';
 import { NetworkWeatherDot } from '../components/NetworkWeatherDot';
 import { AmbientBackground } from '../components/AmbientBackground';
 import { Ticks, formatTime } from '../components/Ticks';
+import { glassEdge } from '../components/GlassView';
 import { IconButton } from '../components/icons';
 import { useNetworkWeather } from '../lib/networkWeather';
 
@@ -14,6 +15,7 @@ import { useNetworkWeather } from '../lib/networkWeather';
 // Unread badge is Ember — the one accent per screen.
 export function ChatListScreen({ navigation }: any) {
   const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const chats = useStore((s) => s.chats);
   const messages = useStore((s) => s.messages);
   const whisperUnlocked = useStore((s) => s.whisperUnlocked);
@@ -86,6 +88,7 @@ export function ChatListScreen({ navigation }: any) {
             backgroundColor: palette.bgSurface,
             color: palette.textPrimary,
             borderColor: mode === 'dark' ? 'transparent' : palette.hairline ?? 'transparent',
+            ...glassEdge(palette, dark),
           },
         ]}
       />
@@ -103,7 +106,7 @@ export function ChatListScreen({ navigation }: any) {
                 <Pressable
                   key={chat.id}
                   onPress={() => navigation.navigate('Conversation', { chatId: chat.id })}
-                  style={[styles.row, { backgroundColor: palette.bgSurface }]}
+                  style={[styles.row, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}
                 >
                   <View style={[styles.avatar, { backgroundColor: palette.bgRaised }]}>
                     <Text style={{ color: palette.textPrimary, fontWeight: '600' }}>
@@ -124,10 +127,31 @@ export function ChatListScreen({ navigation }: any) {
             </View>
           ) : null
         }
+        ListEmptyComponent={
+          q.trim() ? (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyKicker, { color: palette.ember }]}>NOTHING HERE YET</Text>
+              <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>No chats match that search.</Text>
+              <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>Try a different name or username.</Text>
+            </View>
+          ) : (
+            <View style={[styles.emptyState, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
+              <View style={[styles.emptyMark, { backgroundColor: palette.ember }]}>
+                <Text style={[styles.emptyMarkText, { color: palette.onAccent }]}>+</Text>
+              </View>
+              <Text style={[styles.emptyKicker, { color: palette.ember }]}>YOUR SPACE IS QUIET</Text>
+              <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>Start a good tangent.</Text>
+              <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>Find someone by username, send a request, and your first conversation will appear here.</Text>
+              <Pressable onPress={() => navigation.navigate('AddContact')} style={[styles.emptyAction, { backgroundColor: palette.ember }]}>
+                <Text style={[styles.emptyActionText, { color: palette.onAccent }]}>Find people</Text>
+              </Pressable>
+            </View>
+          )
+        }
         renderItem={({ item }) => (
             <Pressable
               onPress={() => navigation.navigate('Conversation', { chatId: item.chat.id })}
-              style={[styles.row, { backgroundColor: palette.bgSurface }]}
+              style={[styles.row, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}
             >
             <View style={[styles.avatar, { backgroundColor: palette.bgRaised }]}>
               <Text style={{ color: palette.textPrimary, fontWeight: '600' }}>
@@ -184,16 +208,17 @@ const styles = StyleSheet.create({
   meLetter: { fontWeight: '700', fontSize: 16 },
   section: { fontSize: typeScale.caption.size, fontWeight: '700' },
   reqBadge: { borderRadius: 11, paddingHorizontal: 10, height: 22, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: typeScale.title.size, lineHeight: typeScale.title.lineHeight, fontWeight: '600' },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
   search: {
     marginHorizontal: spacing.lg,
     borderRadius: radius.button,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    minHeight: 50,
     fontSize: typeScale.body.size,
   },
-  row: { borderRadius: radius.bubble, padding: spacing.md, flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  row: { borderRadius: radius.bubble, padding: spacing.md, paddingVertical: 14, flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   mid: { flex: 1, gap: 2 },
   name: { fontSize: typeScale.body.size, fontWeight: '600' },
@@ -203,4 +228,12 @@ const styles = StyleSheet.create({
   time: { fontSize: 11 },
   badge: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   badgeText: { fontSize: 12, fontWeight: '700' },
+  emptyState: { margin: spacing.md, marginTop: spacing.xl, padding: spacing.xl, borderRadius: 22, alignItems: 'center', gap: spacing.sm },
+  emptyMark: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  emptyMarkText: { fontSize: 30, fontWeight: '400', lineHeight: 34 },
+  emptyKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
+  emptyTitle: { fontSize: 24, lineHeight: 30, fontWeight: '700', textAlign: 'center' },
+  emptyBody: { fontSize: typeScale.body.size, lineHeight: 23, textAlign: 'center', maxWidth: 330 },
+  emptyAction: { marginTop: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: 12, borderRadius: radius.button },
+  emptyActionText: { fontSize: typeScale.bodyMedium.size, fontWeight: '700' },
 });

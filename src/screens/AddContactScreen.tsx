@@ -18,6 +18,7 @@ import { DirectoryUser, normalizePhone, usernameFromQrPayload } from '../lib/typ
 import { AmbientBackground } from '../components/AmbientBackground';
 import { IconButton } from '../components/icons';
 import { TButton } from '../components/TButton';
+import { glassEdge } from '../components/GlassView';
 
 type Tab = 'phone' | 'username' | 'scan';
 
@@ -26,6 +27,7 @@ type Tab = 'phone' | 'username' | 'scan';
 // nobody lands straight in your chats.
 export function AddContactScreen({ navigation }: any) {
   const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const [tab, setTab] = useState<Tab>('username');
 
   return (
@@ -44,7 +46,7 @@ export function AddContactScreen({ navigation }: any) {
         <Text style={[styles.title, { color: palette.textPrimary }]}>Add people</Text>
         <View style={{ width: 38 }} />
       </View>
-      <View style={[styles.tabs, { backgroundColor: palette.bgRaised }]}>
+      <View style={[styles.tabs, { backgroundColor: palette.bgRaised }, glassEdge(palette, dark)]}>
         {(['phone', 'username', 'scan'] as Tab[]).map((t) => (
           <Pressable
             key={t}
@@ -65,6 +67,7 @@ export function AddContactScreen({ navigation }: any) {
           </Pressable>
         ))}
       </View>
+      <Text style={[styles.intro, { color: palette.textSecondary }]}>Find someone you know. They will receive a request before either of you can start chatting.</Text>
       {tab === 'phone' ? (
         <PhonePane onOpenChat={(id) => navigation.navigate('Conversation', { chatId: id })} />
       ) : tab === 'username' ? (
@@ -95,9 +98,10 @@ function UserRow({
   status: 'open' | 'pending' | 'new';
   onAction: () => void;
 }) {
-  const { palette } = useTheme();
+  const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   return (
-    <View style={[styles.row, { backgroundColor: palette.bgSurface }]}>
+    <View style={[styles.row, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
       <View style={[styles.avatar, { backgroundColor: palette.bgRaised }]}>
         <Text style={{ color: palette.textPrimary, fontWeight: '700' }}>
           {user.name.slice(0, 1)}
@@ -152,6 +156,7 @@ function useChatStatus() {
 
 function PhonePane({ onOpenChat }: { onOpenChat: (id: string) => void }) {
   const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const findByPhone = useStore((s) => s.findUserByPhone);
   const [phone, setPhone] = useState('');
   interface DeviceContact {
@@ -220,7 +225,7 @@ function PhonePane({ onOpenChat }: { onOpenChat: (id: string) => void }) {
           const num = item.phoneNumbers?.[0]?.number ?? '';
           const match = findByPhone(normalizePhone(num));
           return (
-            <View style={[styles.row, { backgroundColor: palette.bgSurface }]}>
+            <View style={[styles.row, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.name, { color: palette.textPrimary }]}>{item.name}</Text>
                 <Text style={[styles.sub, { color: palette.textSecondary }]}>{num}</Text>
@@ -363,6 +368,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, padding: spacing.lg, gap: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: typeScale.heading.size, fontWeight: '700' },
+  intro: { fontSize: typeScale.caption.size, lineHeight: 20, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   tabs: { flexDirection: 'row', borderRadius: radius.button, padding: 4, gap: 4 },
   tab: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   tabText: { fontSize: typeScale.caption.size, fontWeight: '700' },

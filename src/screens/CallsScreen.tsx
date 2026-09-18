@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { gradients, spacing, typeScale } from '../theme/tokens';
 import { AmbientBackground } from '../components/AmbientBackground';
+import { glassEdge } from '../components/GlassView';
 import { NetworkWeatherDot } from '../components/NetworkWeatherDot';
 import { useNetworkWeather } from '../lib/networkWeather';
 import { TButton } from '../components/TButton';
@@ -14,6 +15,7 @@ import { haptic } from '../lib/haptics';
 // Network Weather sits quietly near top. Audio-only fallback banner pattern.
 export function CallsScreen({ navigation }: any) {
   const { palette, mode } = useTheme();
+  const dark = mode === 'dark';
   const quality = useNetworkWeather();
   const [simulated, setSimulated] = useState<string | null>(null);
   const pg = gradients[mode].primary;
@@ -23,8 +25,9 @@ export function CallsScreen({ navigation }: any) {
       <AmbientBackground>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <Text style={[styles.title, { color: palette.textPrimary }]}>Calls</Text>
+      <Text style={[styles.intro, { color: palette.textSecondary }]}>Calls are ready for when your conversations need a voice. Audio fallback keeps them steady on weak signal.</Text>
       <NetworkWeatherDot quality={quality} />
-      <View style={[styles.card, { backgroundColor: palette.bgSurface }]}>
+      <View style={[styles.card, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
         <LinearGradient
           colors={[pg[0], pg[1]]}
           start={{ x: 0, y: 0 }}
@@ -59,7 +62,7 @@ export function CallsScreen({ navigation }: any) {
         </Text>
       </Pressable>
       {simulated ? (
-        <View style={[styles.banner, { backgroundColor: palette.bgRaised }]}>
+        <View style={[styles.banner, { backgroundColor: palette.bgRaised }, glassEdge(palette, dark)]}>
           <View style={styles.bannerDot}>
             <View style={[styles.bannerHalf, { backgroundColor: palette.weak }]} />
           </View>
@@ -77,12 +80,13 @@ export function CallsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { padding: spacing.lg, gap: spacing.md, flexGrow: 1, paddingBottom: 110 },
-  title: { fontSize: typeScale.title.size, fontWeight: '600' },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700', letterSpacing: -0.3 },
   card: { borderRadius: 16, padding: spacing.lg, gap: spacing.md, alignItems: 'center' },
   avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, fontWeight: '600' },
   name: { fontSize: typeScale.heading.size, fontWeight: '600' },
   sub: { fontSize: typeScale.caption.size, textAlign: 'center' },
+  intro: { fontSize: typeScale.body.size, lineHeight: 23 },
   sim: { fontSize: typeScale.caption.size, textAlign: 'center' },
   banner: { borderRadius: 10, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 8 },
   bannerDot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
