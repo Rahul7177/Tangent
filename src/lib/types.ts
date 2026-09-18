@@ -1,7 +1,7 @@
 // Core domain types — PRD Modules 1, 4, 8.
 
 export type Receipt = 'sending' | 'sent' | 'delivered' | 'read';
-export type MessageKind = 'text' | 'image' | 'voice' | 'system';
+export type MessageKind = 'text' | 'image' | 'video' | 'voice' | 'system';
 
 export interface Reaction {
   emoji: string;
@@ -23,6 +23,10 @@ export interface ChatMessage {
   pinned?: boolean;
   starred?: boolean;
   whisperSessionId?: string;
+  mediaUri?: string;
+  mediaMimeType?: string;
+  mediaName?: string;
+  mediaDuration?: number;
   threadCount?: number;
   offlineQueued?: boolean;
 }

@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, typeScale } from '../theme/tokens';
@@ -24,6 +26,7 @@ import { GlassView, glassEdge } from '../components/GlassView';
 import { AmbientBackground } from '../components/AmbientBackground';
 import { Icon, IconButton, IconName, IconSlot } from '../components/icons';
 import { haptic } from '../lib/haptics';
+import { publishMediaMessage } from '../lib/realtime';
 
 const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '🙏', '👏'];
 
@@ -65,6 +68,9 @@ export function ConversationScreen({ route, navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -106,6 +112,45 @@ export function ConversationScreen({ route, navigation }: any) {
     setReplyTo(null);
     markRead(chatId);
     scrollToEnd();
+  };
+
+  const pickMedia = async () => {
+    if (!chat?.username || mediaBusy) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: false, quality: 0.8 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setMediaBusy(true);
+    try {
+      await publishMediaMessage({ to: chat.username, uri: asset.uri, kind: asset.type === 'video' ? 'video' : 'image', mimeType: asset.mimeType, name: asset.fileName ?? undefined, duration: asset.duration ? asset.duration / 1000 : undefined });
+    } catch {
+      Alert.alert('Upload failed', 'The media could not be sent. Check your connection and try again.');
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (!chat?.username || mediaBusy) return;
+    if (!recorderState.isRecording) {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Microphone permission needed', 'Allow Tangent to use your microphone to send voice messages.');
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      return;
+    }
+    setMediaBusy(true);
+    try {
+      await recorder.stop();
+      if (recorder.uri) await publishMediaMessage({ to: chat.username, uri: recorder.uri, kind: 'voice', mimeType: 'audio/m4a', name: `voice-${Date.now()}.m4a`, duration: recorderState.durationMillis / 1000 });
+    } catch {
+      Alert.alert('Voice message failed', 'The recording could not be sent.');
+    } finally {
+      setMediaBusy(false);
+    }
   };
 
   const replyTarget = replyTo ? byId.get(replyTo) : undefined;
@@ -338,7 +383,7 @@ export function ConversationScreen({ route, navigation }: any) {
             iconSize={22}
             color={palette.textSecondary}
             backgroundColor={palette.bgSurface}
-            onPress={() => Alert.alert('Attachments', 'Text chat is ready. Photo, GIF, and file sharing will be added in a later update.')}
+            onPress={() => void pickMedia()}
           />
           <View style={[styles.inputPill, { backgroundColor: palette.bgSurface }]}>
             <TextInput
@@ -371,7 +416,7 @@ export function ConversationScreen({ route, navigation }: any) {
               iconSize={22}
               color={palette.textSecondary}
               backgroundColor={palette.bgRaised}
-              onPress={() => Alert.alert('Voice notes', 'Voice notes are not available yet. You can send text instantly while we keep the app lightweight.')}
+              onPress={() => void toggleRecording()}
             />
           )}
         </View>

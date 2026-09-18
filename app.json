@@ -9,14 +9,18 @@
     "splash": {
       "backgroundColor": "#FFFFFF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.tangent.chat",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Unlock Whisper — your per-chat hidden space.",
         "NSCameraUsageDescription": "Scan a friend's profile QR to add them on Tangent.",
-        "NSContactsUsageDescription": "Find your contacts who are already on Tangent."
+        "NSContactsUsageDescription": "Find your contacts who are already on Tangent.",
+        "NSPhotoLibraryUsageDescription": "Choose photos and videos to share in a chat.",
+        "NSMicrophoneUsageDescription": "Record voice messages to share in a chat."
       }
     },
     "android": {
@@ -28,7 +32,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT", "CAMERA", "READ_CONTACTS"],
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA",
+        "READ_CONTACTS",
+        "RECORD_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -40,11 +50,23 @@
       "expo-secure-store",
       [
         "expo-camera",
-        { "cameraPermission": "Scan a friend's profile QR to add them on Tangent." }
+        {
+          "cameraPermission": "Scan a friend's profile QR to add them on Tangent."
+        }
       ],
       [
         "expo-contacts",
-        { "contactsPermission": "Find your contacts who are already on Tangent." }
+        {
+          "contactsPermission": "Find your contacts who are already on Tangent."
+        }
+      ],
+      "expo-audio"
+      ,[
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos and videos to share in a chat.",
+          "microphonePermission": "Record voice messages to share in a chat."
+        }
       ]
     ]
   }

@@ -224,7 +224,35 @@ Optional fields such as `replyToId` are only added when they have a value. Fireb
 
 Incoming messages are normalized before entering the store. Missing legacy fields such as `reactions` receive safe defaults, preventing a malformed old message from blanking the conversation screen.
 
-## 10. Message Gating
+## 10. Media Messages
+
+Images, videos, and voice messages use Firebase Storage plus the existing Realtime Database inbox.
+
+### Image and video flow
+
+1. The user taps the attachment button.
+2. Expo ImagePicker opens the device media library.
+3. The selected asset is uploaded to `media/<sender-firebase-uid>/<timestamp>-<filename>`.
+4. Firebase returns a download URL.
+5. The app writes a media message to `inbox/<receiver-username>` with its kind, URL, MIME type, filename, and optional duration.
+6. The receiver renders images inline and opens videos from the message bubble.
+
+### Voice-message flow
+
+1. The user taps the microphone button.
+2. Expo Audio requests microphone permission and starts recording.
+3. Tapping the microphone again stops the recording.
+4. The recording is uploaded to Firebase Storage.
+5. The receiver gets a `voice` message with its download URL and can play it from the message bubble.
+
+Storage rules limit uploads to authenticated users and files smaller than 50 MB. Before the first
+media deployment, open Firebase Console → Storage → Get started for project `tangent001`, then run:
+
+```bash
+firebase deploy --only storage --project tangent001
+```
+
+## 11. Message Gating
 
 `ConversationScreen` computes:
 
@@ -239,7 +267,7 @@ When gated:
 - The composer is not rendered.
 - `sendMessage()` also rejects sends for non-active chats as a second safety check.
 
-## 11. Firebase Database Rules
+## 12. Firebase Database Rules
 
 The rules default to deny:
 
@@ -263,7 +291,7 @@ Publish rules after any changes:
 firebase deploy --only database --project tangent001
 ```
 
-## 12. Local and APK Builds
+## 13. Local and APK Builds
 
 Local web development:
 
@@ -281,10 +309,11 @@ npx eas build -p android --profile preview
 
 For an APK, Firebase environment values must be available to the EAS build environment. A local `.env.local` is enough for local Expo development but is not automatically available to a remote EAS build.
 
-## 13. Current Limitations
+## 14. Current Limitations
 
 - Google sign-in is currently implemented for the web flow. Native Google sign-in requires native Firebase app registrations and OAuth configuration.
 - Message delivery is realtime through inbox records. Read receipts, reactions, edits, and deletes are currently primarily local UI/store behavior and need additional Firebase event paths for full cross-device synchronization.
 - Presence is stored as a boolean and does not yet use Firebase `onDisconnect()` cleanup.
-- Media, voice notes, and calls are not part of the current reliable text-chat path.
+- Media uploads require Firebase Storage to be initialized once in the Firebase Console.
+- Media messages currently open videos/audio through their uploaded URLs; an in-app media player is a follow-up polish item.
 - Firebase Realtime Database does not automatically provide end-to-end encryption. The UI currently displays an encryption label, but cryptographic E2E is not implemented by this client.

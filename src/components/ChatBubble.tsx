@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChatMessage } from '../lib/types';
 import { useTheme } from '../theme/ThemeContext';
@@ -113,6 +113,23 @@ export function ChatBubble({
             </Text>
           </View>
         </View>
+      ) : null}
+      {msg.mediaUri && msg.kind === 'image' ? (
+        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)}>
+          <Image source={{ uri: msg.mediaUri }} style={styles.mediaImage} />
+        </Pressable>
+      ) : null}
+      {msg.mediaUri && msg.kind === 'video' ? (
+        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)} style={styles.mediaCard}>
+          <Icon name="video" size={22} color={ink} />
+          <Text style={[styles.mediaLabel, { color: ink }]}>Open video</Text>
+        </Pressable>
+      ) : null}
+      {msg.mediaUri && msg.kind === 'voice' ? (
+        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)} style={styles.mediaCard}>
+          <Icon name="mic" size={22} color={ink} />
+          <Text style={[styles.mediaLabel, { color: ink }]}>Play voice message</Text>
+        </Pressable>
       ) : null}
       <Text style={[styles.text, { color: ink }]}>{msg.text}</Text>
       <View style={styles.metaRow}>
@@ -253,4 +270,7 @@ const styles = StyleSheet.create({
     marginTop: -6,
     marginHorizontal: 6,
   },
+  mediaImage: { width: 220, height: 180, borderRadius: 12, marginBottom: 4 },
+  mediaCard: { minWidth: 170, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10 },
+  mediaLabel: { fontSize: 14, fontWeight: '600' },
 });

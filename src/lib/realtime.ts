@@ -21,6 +21,7 @@ import {
   set,
   get,
 } from 'firebase/database';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ChatMessage, DirectoryUser } from './types';
 
 export type RealtimeEvent =
@@ -156,6 +157,10 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
       receipt: raw.receipt ?? 'delivered',
       replyToId: raw.replyToId,
       reactions: Array.isArray(raw.reactions) ? raw.reactions : [],
+      mediaUri: raw.mediaUri,
+      mediaMimeType: raw.mediaMimeType,
+      mediaName: raw.mediaName,
+      mediaDuration: raw.mediaDuration,
     };
     if (message.sender !== username) emit({ type: 'message', message });
   }, handleRealtimeError));
@@ -201,6 +206,41 @@ export function subscribeRealtime(listener: Listener) {
   return () => {
     listeners = listeners.filter((item) => item !== listener);
   };
+}
+
+export async function publishMediaMessage(payload: {
+  to: string;
+  uri: string;
+  kind: 'image' | 'video' | 'voice';
+  mimeType?: string;
+  name?: string;
+  duration?: number;
+}) {
+  if (!database || !username) return;
+  const app = getApps()[0];
+  const response = await fetch(payload.uri);
+  const blob = await response.blob();
+  const mediaId = `${username}/${Date.now()}-${payload.name ?? 'media'}`;
+  const fileRef = storageRef(getStorage(app), `media/${mediaId}`);
+  await uploadBytes(fileRef, blob, payload.mimeType ? { contentType: payload.mimeType } : undefined);
+  const mediaUri = await getDownloadURL(fileRef);
+  const message = {
+    id: `msg-${Math.random().toString(36).slice(2, 8)}`,
+    chatId: chatIdFor(username, payload.to),
+    sender: username,
+    senderUid: getAuth().currentUser?.uid ?? '',
+    mine: false,
+    kind: payload.kind,
+    text: payload.kind === 'voice' ? 'Voice message' : payload.kind === 'video' ? 'Video' : 'Photo',
+    mediaUri,
+    mediaMimeType: payload.mimeType,
+    mediaName: payload.name,
+    mediaDuration: payload.duration,
+    createdAt: Date.now(),
+    receipt: 'delivered' as const,
+    reactions: [],
+  };
+  await set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to });
 }
 
 export function publishRealtime(payload: { type: 'message'; to: string; text: string; replyToId?: string; clientId?: string }) {
