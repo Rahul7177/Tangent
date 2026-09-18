@@ -49,6 +49,7 @@ let database: ReturnType<typeof getDatabase> | null = null;
 let connectedUsername = '';
 let detachRealtime: (() => void)[] = [];
 let authInstance: ReturnType<typeof getAuth> | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function firebaseReady() {
   return configured;
@@ -72,6 +73,8 @@ async function prepareAuth() {
 }
 
 export async function signOutRealtime() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
   detachRealtime.forEach((detach) => detach());
   detachRealtime = [];
   connectedUsername = '';
@@ -127,6 +130,19 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
     if (snapshot.exists()) emit({ type: 'presence', username, online: Boolean(snapshot.val()) });
   }));
   await set(ref(database, `presence/${username}`), true);
+  const activeUsername = username;
+  const handleRealtimeError = (error: Error) => {
+    console.warn('Firebase realtime listener failed:', error.message);
+    connectedUsername = '';
+    if (!reconnectTimer) {
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        void connectRealtime(name, activeUsername, phone).catch((retryError) => {
+          console.warn('Firebase realtime reconnect failed:', retryError);
+        });
+      }, 1500);
+    }
+  };
   detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
     const raw = snapshot.val() as Partial<ChatMessage>;
     const message: ChatMessage = {
@@ -142,7 +158,7 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
       reactions: Array.isArray(raw.reactions) ? raw.reactions : [],
     };
     if (message.sender !== username) emit({ type: 'message', message });
-  }));
+  }, handleRealtimeError));
   detachRealtime.push(onChildAdded(ref(database, `requests/${username}`), (snapshot) => {
     const request = snapshot.val() as {
       id: string;

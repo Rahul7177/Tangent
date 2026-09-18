@@ -96,17 +96,17 @@ export function AmbientBackground({
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(drift, { toValue: 1, duration: 9000, useNativeDriver: nativeDriver }),
-        Animated.timing(drift, { toValue: 0, duration: 9000, useNativeDriver: nativeDriver }),
+        Animated.timing(drift, { toValue: 1, duration: 6500, useNativeDriver: nativeDriver }),
+        Animated.timing(drift, { toValue: 0, duration: 6500, useNativeDriver: nativeDriver }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [drift, nativeDriver]);
 
-  const translateX = drift.interpolate({ inputRange: [0, 1], outputRange: [-12, 18] });
-  const translateY = drift.interpolate({ inputRange: [0, 1], outputRange: [10, -12] });
-  const scale = drift.interpolate({ inputRange: [0, 1], outputRange: [1.02, 1.06] });
+  const translateX = drift.interpolate({ inputRange: [0, 1], outputRange: [-22, 30] });
+  const translateY = drift.interpolate({ inputRange: [0, 1], outputRange: [18, -18] });
+  const scale = drift.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.1] });
   return (
     <View style={[{ flex: 1, backgroundColor: palette.bgBase, overflow: 'hidden' }, style]}>
       <Animated.View
