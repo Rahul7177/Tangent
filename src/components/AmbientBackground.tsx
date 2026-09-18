@@ -42,9 +42,9 @@ export function GrainOverlay({ opacity = 0.05 }: { opacity?: number }) {
 function AmbientWashes() {
   const { mode } = useTheme();
   const dark = mode === 'dark';
-  const top = dark ? 'rgba(74,133,226,0.13)' : 'rgba(72,132,225,0.10)';
-  const bottom = dark ? 'rgba(255,255,255,0.045)' : 'rgba(39,76,130,0.035)';
-  const side = dark ? 'rgba(31,76,150,0.10)' : 'rgba(122,166,226,0.07)';
+  const top = dark ? 'rgba(92,164,233,0.18)' : 'rgba(122,197,233,0.20)';
+  const bottom = dark ? 'rgba(4,12,22,0.18)' : 'rgba(183,220,231,0.16)';
+  const side = dark ? 'rgba(47,102,158,0.14)' : 'rgba(151,211,232,0.15)';
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient

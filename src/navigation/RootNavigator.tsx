@@ -48,9 +48,9 @@ function MainTabs() {
         tabBarHideOnKeyboard: true,
         tabBarBackground: () => (
           <BlurView
-            intensity={64}
+            intensity={78}
             tint={mode === 'dark' ? 'dark' : 'light'}
-            style={{ flex: 1, backgroundColor: palette.glass }}
+            style={{ flex: 1, backgroundColor: palette.glass, borderTopColor: palette.hairline ?? 'transparent', borderTopWidth: 1 }}
           />
         ),
         tabBarStyle: {

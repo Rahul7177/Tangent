@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { gradients, radius, typeScale } from '../theme/tokens';
 
-// One gradient-primary CTA per screen; everything else ghost/text.
-// Gradient is single-hue lagoon mint — minimal, never purple/blue, never animated.
+// One clear blue CTA per screen; secondary actions use the same glass language
+// as the surrounding surface instead of a heavy outlined rectangle.
 export function TButton({
   title,
   onPress,
@@ -22,7 +22,7 @@ export function TButton({
       <Pressable
         accessibilityRole="button"
         onPress={onPress}
-        style={[styles.base, { borderWidth: 1, borderColor: palette.textPrimary }]}
+        style={[styles.base, styles.ghost, { borderColor: palette.hairline ?? 'rgba(255,255,255,0.18)', backgroundColor: palette.glass }]}
       >
         <Text style={{ fontSize: typeScale.body.size, fontWeight: '600', color: palette.textPrimary }}>
           {title}
@@ -59,4 +59,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 48,
   },
+  ghost: { borderWidth: 1 },
 });

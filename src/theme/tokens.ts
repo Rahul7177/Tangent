@@ -1,9 +1,6 @@
-// Tangent design tokens — "deep black + electric blue" theme.
-// Primary surfaces are PURE neutrals: white (light) / black (dark) — no tint.
-// The blue accent lives ONLY on actions: icons, buttons, own-bubbles, badges,
-// active states. Backgrounds get depth from ambient washes + frosted
-// translucency + film grain (see AmbientBackground), never from color.
-// Still banned: purple/blue gradients, gradient text, neon glow.
+// Tangent design tokens — airy ice glass in light mode, midnight glass in dark.
+// Blue is the functional accent; atmosphere comes from translucent layered color
+// washes and grain rather than opaque panels or neon effects.
 
 export const spacing = {
   xs: 4,
@@ -50,34 +47,34 @@ export interface Palette {
 }
 
 export const lightPalette: Palette = {
-  bgBase: '#FFFFFF',
-  bgSurface: '#F4F4F4',
-  bgRaised: '#E9E9E9',
-  textPrimary: '#0A0A0A',
-  textSecondary: '#6E6E6E',
-  hairline: '#E4E4E4',
+  bgBase: '#EAF5FA',
+  bgSurface: 'rgba(255,255,255,0.62)',
+  bgRaised: 'rgba(255,255,255,0.78)',
+  textPrimary: '#10202B',
+  textSecondary: '#607583',
+  hairline: 'rgba(126,164,183,0.28)',
   shadow: null,
   ember: '#2F7BFF',
   emberPressed: '#1E5FD3',
   onAccent: '#FFFFFF',
-  glass: 'rgba(255,255,255,0.64)',
+  glass: 'rgba(255,255,255,0.54)',
   good: '#3E7A5C',
   weak: '#A9812E',
   bad: '#A8443A',
 };
 
 export const darkPalette: Palette = {
-  bgBase: '#000000',
-  bgSurface: '#131313',
-  bgRaised: '#222222',
-  textPrimary: '#F5F5F5',
-  textSecondary: '#9C9C9C',
+  bgBase: '#0B1421',
+  bgSurface: 'rgba(24,38,55,0.68)',
+  bgRaised: 'rgba(55,76,98,0.56)',
+  textPrimary: '#F3F8FC',
+  textSecondary: '#A7BBC9',
   hairline: null,
   shadow: '0 2px 12px rgba(0,0,0,0.35)',
   ember: '#65A3FF',
   emberPressed: '#3F83E8',
   onAccent: '#061326',
-  glass: 'rgba(12,16,24,0.58)',
+  glass: 'rgba(15,29,44,0.54)',
   good: '#6FA37E',
   weak: '#CBA354',
   bad: '#D26858',
@@ -90,14 +87,14 @@ export type GradientStop = [string, string];
 export const gradients: Record<ThemeMode, { primary: GradientStop; hero: GradientStop; card: GradientStop; sender: GradientStop }> = {
   light: {
     primary: ['#1E5FD3', '#65A3FF'],
-    hero: ['#F9FBFF', '#EAF2FF'],
-    card: ['#FFFFFF', '#F2F6FC'],
+    hero: ['#F9FDFF', '#DDEFFA'],
+    card: ['rgba(255,255,255,0.82)', 'rgba(221,239,250,0.66)'],
     sender: ['#D8E7FF', '#BBD4FF'],
   },
   dark: {
     primary: ['#65A3FF', '#2F7BFF'],
-    hero: ['#070A10', '#131C2B'],
-    card: ['#141922', '#0A0D13'],
+    hero: ['#0A1523', '#152D43'],
+    card: ['rgba(28,49,69,0.82)', 'rgba(12,25,39,0.72)'],
     sender: ['#5D99F5', '#2F6FD9'],
   },
 };
