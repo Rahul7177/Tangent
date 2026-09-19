@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChatMessage } from '../lib/types';
 import { useTheme } from '../theme/ThemeContext';
@@ -115,15 +115,16 @@ export function ChatBubble({
         </View>
       ) : null}
       {msg.mediaUri && msg.kind === 'image' ? (
-        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)}>
-          <Image source={{ uri: msg.mediaUri }} style={styles.mediaImage} />
-        </Pressable>
+        <View style={styles.mediaCard}>
+          <Icon name="plus" size={22} color={ink} />
+          <Text style={[styles.mediaLabel, { color: ink }]}>Photo sharing coming soon</Text>
+        </View>
       ) : null}
       {msg.mediaUri && msg.kind === 'video' ? (
-        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)} style={styles.mediaCard}>
+        <View style={styles.mediaCard}>
           <Icon name="video" size={22} color={ink} />
-          <Text style={[styles.mediaLabel, { color: ink }]}>Open video</Text>
-        </Pressable>
+          <Text style={[styles.mediaLabel, { color: ink }]}>Video sharing coming soon</Text>
+        </View>
       ) : null}
       {msg.mediaUri && msg.kind === 'voice' ? (
         <View style={styles.mediaCard}>
