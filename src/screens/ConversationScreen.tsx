@@ -66,6 +66,13 @@ export function ConversationScreen({ route, navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIndex, setSearchIndex] = useState(0);
+  const searchMatches = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return query ? msgs.filter((message) => message.text.toLowerCase().includes(query)) : [];
+  }, [msgs, searchQuery]);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -85,6 +92,13 @@ export function ConversationScreen({ route, navigation }: any) {
     requestAnimationFrame(() => {
       listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.45 });
     });
+  };
+
+  const moveSearch = (direction: 1 | -1) => {
+    if (!searchMatches.length) return;
+    const next = (searchIndex + direction + searchMatches.length) % searchMatches.length;
+    setSearchIndex(next);
+    scrollToMessage(searchMatches[next].id);
   };
 
   // Stay pinned to latest when new messages arrive or keyboard opens.
@@ -168,6 +182,18 @@ export function ConversationScreen({ route, navigation }: any) {
             </Text>
           </Pressable>
           <IconButton
+            name="search"
+            label="Search messages"
+            size={38}
+            iconSize={21}
+            color={palette.textSecondary}
+            onPress={() => {
+              setSearchOpen((open) => !open);
+              setSearchQuery('');
+              setSearchIndex(0);
+            }}
+          />
+          <IconButton
             name="video"
             label="Video call"
             size={38}
@@ -192,6 +218,28 @@ export function ConversationScreen({ route, navigation }: any) {
             onPress={() => navigation.navigate('Whisper', { chatId })}
           />
         </BlurView>
+
+        {searchOpen ? (
+          <View style={[styles.messageSearch, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
+            <TextInput
+              value={searchQuery}
+              onChangeText={(value) => {
+                setSearchQuery(value);
+                setSearchIndex(0);
+              }}
+              placeholder="Search in this chat"
+              placeholderTextColor={palette.textSecondary}
+              autoFocus
+              style={[styles.messageSearchInput, { color: palette.textPrimary }]}
+            />
+            <Text style={[styles.searchCount, { color: palette.textSecondary }]}>
+              {searchQuery.trim() ? `${searchMatches.length ? searchIndex + 1 : 0}/${searchMatches.length}` : ''}
+            </Text>
+            <IconButton name="back" label="Previous result" size={32} iconSize={18} color={palette.textSecondary} onPress={() => moveSearch(-1)} />
+            <IconButton name="forward" label="Next result" size={32} iconSize={18} color={palette.textSecondary} onPress={() => moveSearch(1)} />
+            <IconButton name="close" label="Close message search" size={32} iconSize={18} color={palette.textSecondary} onPress={() => setSearchOpen(false)} />
+          </View>
+        ) : null}
 
         {pinned.length > 0 ? (
           <Pressable
@@ -573,6 +621,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
+  messageSearch: { flexDirection: 'row', alignItems: 'center', gap: 4, marginHorizontal: 8, marginTop: 8, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1 },
+  messageSearchInput: { flex: 1, minHeight: 40, fontSize: 15 },
+  searchCount: { minWidth: 34, fontSize: 11, textAlign: 'right' },
   pinnedBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 8, padding: 10, borderRadius: 12, borderWidth: 1 },
   pinnedLabel: { fontSize: 11, fontWeight: '700' },
   pinnedText: { fontSize: 12, marginTop: 2 },
