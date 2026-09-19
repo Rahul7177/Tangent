@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -26,7 +27,7 @@ import { GlassView, glassEdge } from '../components/GlassView';
 import { AmbientBackground } from '../components/AmbientBackground';
 import { Icon, IconButton, IconName, IconSlot } from '../components/icons';
 import { haptic } from '../lib/haptics';
-import { publishMediaMessage } from '../lib/realtime';
+import { formatDuration } from '../lib/types';
 
 const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '🙏', '👏'];
 
@@ -41,6 +42,7 @@ export function ConversationScreen({ route, navigation }: any) {
   const chats = useStore((s) => s.chats);
   const all = useStore((s) => s.messages);
   const send = useStore((s) => s.sendMessage);
+  const sendMedia = useStore((s) => s.sendMedia);
   const editMsg = useStore((s) => s.editMessage);
   const deleteMsg = useStore((s) => s.deleteMessage);
   const deleteEveryone = useStore((s) => s.deleteMessageForEveryone);
@@ -90,6 +92,10 @@ export function ConversationScreen({ route, navigation }: any) {
   }, [msgs.length]);
 
   useEffect(() => {
+    void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       scrollToEnd,
@@ -115,23 +121,63 @@ export function ConversationScreen({ route, navigation }: any) {
   };
 
   const pickMedia = async () => {
-    if (!chat?.username || mediaBusy) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: false, quality: 0.8 });
-    if (result.canceled || !result.assets[0]) return;
-    const asset = result.assets[0];
+    if (mediaBusy || gated) return;
+    Alert.alert('Attach', undefined, [
+      { text: 'Photo library', onPress: () => void pickFromLibrary() },
+      { text: 'Take photo', onPress: () => void takePhoto() },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const deliverImage = async (uri: string | undefined, mimeType?: string) => {
+    if (!uri) return;
+    haptic.messageSent();
+    await sendMedia(chatId, 'image', uri, { mimeType, replyToId: replyTo ?? undefined });
+    setReplyTo(null);
+    markRead(chatId);
+    scrollToEnd();
+  };
+
+  const pickFromLibrary = async () => {
     setMediaBusy(true);
     try {
-      await publishMediaMessage({ to: chat.username, uri: asset.uri, kind: asset.type === 'video' ? 'video' : 'image', mimeType: asset.mimeType, name: asset.fileName ?? undefined, duration: asset.duration ? asset.duration / 1000 : undefined });
-    } catch {
-      Alert.alert('Upload failed', 'The media could not be sent. Check your connection and try again.');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: false,
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      deliverImage(asset.uri, asset.mimeType);
+    } catch (error: any) {
+      Alert.alert('Media could not be sent', String(error?.message ?? '').includes('storage') ? 'Open Firebase Console → Storage → Get started, then try again.' : 'Check your connection and try again.');
     } finally {
       setMediaBusy(false);
     }
   };
 
-  const toggleRecording = async () => {
-    if (!chat?.username || mediaBusy) return;
-    if (!recorderState.isRecording) {
+  const takePhoto = async () => {
+    setMediaBusy(true);
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Camera permission needed', 'Allow Tangent to use your camera to take photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      deliverImage(asset.uri, asset.mimeType);
+    } catch (error: any) {
+      Alert.alert('Media could not be sent', String(error?.message ?? '').includes('storage') ? 'Open Firebase Console → Storage → Get started, then try again.' : 'Check your connection and try again.');
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const startRecording = async () => {
+    if (mediaBusy || gated || recorderState.isRecording) return;
+    try {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
         Alert.alert('Microphone permission needed', 'Allow Tangent to use your microphone to send voice messages.');
@@ -140,16 +186,35 @@ export function ConversationScreen({ route, navigation }: any) {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
-      return;
+    } catch {
+      Alert.alert('Recording failed', 'The microphone could not be started. Try again.');
     }
+  };
+
+  const stopRecording = async (sendIt: boolean) => {
+    if (!recorderState.isRecording) return;
+    const durationMs = recorderState.durationMillis ?? 0;
     setMediaBusy(true);
     try {
       await recorder.stop();
-      if (recorder.uri) await publishMediaMessage({ to: chat.username, uri: recorder.uri, kind: 'voice', mimeType: 'audio/m4a', name: `voice-${Date.now()}.m4a`, duration: recorderState.durationMillis / 1000 });
+      const uri = recorder.uri;
+      if (sendIt && uri && durationMs >= 800) {
+        haptic.messageSent();
+        await sendMedia(chatId, 'voice', uri, {
+          durationMs,
+          mimeType: 'audio/m4a',
+          replyToId: replyTo ?? undefined,
+        });
+        setDraft('');
+        setReplyTo(null);
+        markRead(chatId);
+        scrollToEnd();
+      }
     } catch {
       Alert.alert('Voice message failed', 'The recording could not be sent.');
     } finally {
       setMediaBusy(false);
+      setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     }
   };
 
@@ -376,6 +441,36 @@ export function ConversationScreen({ route, navigation }: any) {
           ]}
         >
         <View style={styles.composerRow}>
+        {recorderState.isRecording ? (
+          <>
+          <View style={[styles.recDot, { backgroundColor: palette.bad }]} />
+          <Text style={[styles.recTime, { color: palette.textPrimary }]}>
+            {formatDuration(recorderState.durationMillis ?? 0)}
+          </Text>
+          <Text style={[styles.recHint, { color: palette.textSecondary }]} numberOfLines={1}>
+            Recording voice note
+          </Text>
+          <IconButton
+            name="trash"
+            label="Discard recording"
+            size={44}
+            iconSize={22}
+            color={palette.textSecondary}
+            backgroundColor={palette.bgSurface}
+            onPress={() => void stopRecording(false)}
+          />
+          <IconButton
+            name="send"
+            label="Send voice note"
+            size={44}
+            iconSize={22}
+            color={palette.onAccent}
+            backgroundColor={palette.ember}
+            onPress={() => void stopRecording(true)}
+          />
+          </>
+        ) : (
+          <>
           <IconButton
             name="plus"
             label="Attach"
@@ -416,9 +511,11 @@ export function ConversationScreen({ route, navigation }: any) {
               iconSize={22}
               color={palette.textSecondary}
               backgroundColor={palette.bgRaised}
-              onPress={() => void toggleRecording()}
+              onPress={() => void startRecording()}
             />
           )}
+          </>
+        )}
         </View>
         </BlurView>
         ) : null}
@@ -466,6 +563,29 @@ export function ConversationScreen({ route, navigation }: any) {
               }
             />
             <SheetRow
+              name="forward"
+              label="Share"
+              onPress={() =>
+                sheetAction(async () => {
+                  if (!menuMsg) return;
+                  try {
+                    if (menuMsg.mediaUri) {
+                      await Share.share({
+                        url: menuMsg.mediaUri,
+                        message: menuMsg.text,
+                      });
+                    } else {
+                      await Share.share({
+                        message: menuMsg.text,
+                      });
+                    }
+                  } catch (err) {
+                    console.warn('Share error:', err);
+                  }
+                })
+              }
+            />
+            <SheetRow
               name="star"
               label={menuMsg?.starred ? 'Remove star' : 'Star message'}
               onPress={() => sheetAction(() => menuFor && toggleStar(menuFor))}
@@ -478,7 +598,7 @@ export function ConversationScreen({ route, navigation }: any) {
                 if (!togglePin(menuFor)) Alert.alert('Pin limit reached', 'You can pin up to 3 messages in a chat.');
               })}
             />
-            {menuMsg?.mine ? (
+            {menuMsg?.mine && menuMsg.kind === 'text' ? (
               <SheetRow
                 name="edit"
                 label="Edit"
@@ -637,6 +757,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  recDot: { width: 10, height: 10, borderRadius: 5, marginLeft: 8 },
+  recTime: { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  recHint: { flex: 1, fontSize: 13 },
   inputPill: {
     flex: 1,
     minHeight: 44,

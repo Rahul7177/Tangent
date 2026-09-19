@@ -290,8 +290,8 @@ export async function publishMediaMessage(payload: {
   mimeType?: string;
   name?: string;
   duration?: number;
-}) {
-  if (!database || !username) return;
+}): Promise<{ mediaUri: string; messageId: string }> {
+  if (!database || !username) throw new Error('Realtime connection is not ready. Please sign in again.');
   const app = getApps()[0];
   const auth = getAuth();
   const uid = auth.currentUser?.uid;
@@ -341,6 +341,7 @@ export async function publishMediaMessage(payload: {
     reactions: [],
   };
   await set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to });
+  return { mediaUri, messageId: message.id };
 }
 
 export function publishRealtime(payload: { type: 'message'; to: string; text: string; replyToId?: string; clientId?: string }) {
