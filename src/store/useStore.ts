@@ -1,8 +1,7 @@
 import { create } from 'zustand';
-import { Chat, ChatMessage, DirectoryUser, TangentThread, formatDuration, isValidUsername } from '../lib/types';
+import { Chat, ChatMessage, DirectoryUser, TangentThread, isValidUsername } from '../lib/types';
 import {
   connectRealtime,
-  publishMediaMessage,
   publishRealtime,
   publishRequest,
   publishRequestAccepted,
@@ -57,12 +56,6 @@ interface TangentState {
   acceptRequest: (chatId: string) => void;
   declineRequest: (chatId: string) => void;
   sendMessage: (chatId: string, text: string, opts?: { replyToId?: string }) => void;
-  sendMedia: (
-    chatId: string,
-    kind: 'image' | 'voice',
-    mediaUri: string,
-    opts?: { caption?: string; durationMs?: number; mimeType?: string; replyToId?: string },
-  ) => Promise<void>;
   receiveMessage: (chatId: string, text: string, sender?: string) => void;
   editMessage: (messageId: string, text: string) => void;
   deleteMessage: (messageId: string) => void;
@@ -328,42 +321,6 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
         }));
       }
     }, 1200);
-  },
-
-  // Local-first media: the message appears instantly with the device-local
-  // URI and climbs the same ack ladder as text. The backend upload (when a
-  // peer username exists and realtime is configured) runs in the background.
-  sendMedia: async (chatId, kind, mediaUri, opts) => {
-    if (!mediaUri) return;
-    const chat = get().chats.find((c) => c.id === chatId);
-    if (chat && !chat.isGroup && chat.requestStatus && chat.requestStatus !== 'active') return;
-    const fallbackText =
-      kind === 'image' ? opts?.caption?.trim() || 'Photo' : `Voice note${opts?.durationMs ? ` (${formatDuration(opts.durationMs)})` : ''}`;
-    const msg: ChatMessage = {
-      id: uid('msg'),
-      chatId,
-      sender: get().currentUser.username,
-      mine: true,
-      kind,
-      text: fallbackText.slice(0, 2000),
-      createdAt: Date.now(),
-      receipt: 'sending',
-      replyToId: opts?.replyToId,
-      whisperSessionId: get().whisperSessions[chatId]?.id,
-      reactions: [],
-      mediaUri,
-      mediaMimeType: opts?.mimeType,
-      mediaDuration: opts?.durationMs,
-    };
-    if (!chat?.username) return;
-    const uploaded = await publishMediaMessage({
-      to: chat.username,
-      uri: mediaUri,
-      kind,
-      mimeType: opts?.mimeType,
-      duration: opts?.durationMs ? opts.durationMs / 1000 : undefined,
-    });
-    set((s) => ({ messages: [...s.messages, { ...msg, id: uploaded.messageId, mediaUri: uploaded.mediaUri, receipt: 'delivered' }] }));
   },
 
   receiveMessage: (chatId, text, sender = 'them') => {    const msg: ChatMessage = {

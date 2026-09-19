@@ -15,8 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import * as ImagePicker from 'expo-image-picker';
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, typeScale } from '../theme/tokens';
@@ -27,7 +25,6 @@ import { GlassView, glassEdge } from '../components/GlassView';
 import { AmbientBackground } from '../components/AmbientBackground';
 import { Icon, IconButton, IconName, IconSlot } from '../components/icons';
 import { haptic } from '../lib/haptics';
-import { formatDuration } from '../lib/types';
 
 const QUICK_EMOJI = ['❤️', '😂', '😮', '😢', '🙏', '👏'];
 
@@ -42,7 +39,6 @@ export function ConversationScreen({ route, navigation }: any) {
   const chats = useStore((s) => s.chats);
   const all = useStore((s) => s.messages);
   const send = useStore((s) => s.sendMessage);
-  const sendMedia = useStore((s) => s.sendMedia);
   const editMsg = useStore((s) => s.editMessage);
   const deleteMsg = useStore((s) => s.deleteMessage);
   const deleteEveryone = useStore((s) => s.deleteMessageForEveryone);
@@ -70,9 +66,6 @@ export function ConversationScreen({ route, navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [peerTyping, setPeerTyping] = useState(false);
-  const [mediaBusy, setMediaBusy] = useState(false);
-  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -90,10 +83,6 @@ export function ConversationScreen({ route, navigation }: any) {
   useEffect(() => {
     scrollToEnd();
   }, [msgs.length]);
-
-  useEffect(() => {
-    void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
-  }, []);
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -120,102 +109,8 @@ export function ConversationScreen({ route, navigation }: any) {
     scrollToEnd();
   };
 
-  const pickMedia = async () => {
-    if (mediaBusy || gated) return;
-    Alert.alert('Attach', undefined, [
-      { text: 'Photo library', onPress: () => void pickFromLibrary() },
-      { text: 'Take photo', onPress: () => void takePhoto() },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const deliverImage = async (uri: string | undefined, mimeType?: string) => {
-    if (!uri) return;
-    haptic.messageSent();
-    await sendMedia(chatId, 'image', uri, { mimeType, replyToId: replyTo ?? undefined });
-    setReplyTo(null);
-    markRead(chatId);
-    scrollToEnd();
-  };
-
-  const pickFromLibrary = async () => {
-    setMediaBusy(true);
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: false,
-        quality: 0.8,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
-      deliverImage(asset.uri, asset.mimeType);
-    } catch (error: any) {
-      Alert.alert('Media could not be sent', String(error?.message ?? '').includes('storage') ? 'Open Firebase Console → Storage → Get started, then try again.' : 'Check your connection and try again.');
-    } finally {
-      setMediaBusy(false);
-    }
-  };
-
-  const takePhoto = async () => {
-    setMediaBusy(true);
-    try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Camera permission needed', 'Allow Tangent to use your camera to take photos.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
-      if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
-      deliverImage(asset.uri, asset.mimeType);
-    } catch (error: any) {
-      Alert.alert('Media could not be sent', String(error?.message ?? '').includes('storage') ? 'Open Firebase Console → Storage → Get started, then try again.' : 'Check your connection and try again.');
-    } finally {
-      setMediaBusy(false);
-    }
-  };
-
-  const startRecording = async () => {
-    if (mediaBusy || gated || recorderState.isRecording) return;
-    try {
-      const permission = await AudioModule.requestRecordingPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Microphone permission needed', 'Allow Tangent to use your microphone to send voice messages.');
-        return;
-      }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-    } catch {
-      Alert.alert('Recording failed', 'The microphone could not be started. Try again.');
-    }
-  };
-
-  const stopRecording = async (sendIt: boolean) => {
-    if (!recorderState.isRecording) return;
-    const durationMs = recorderState.durationMillis ?? 0;
-    setMediaBusy(true);
-    try {
-      await recorder.stop();
-      const uri = recorder.uri;
-      if (sendIt && uri && durationMs >= 800) {
-        haptic.messageSent();
-        await sendMedia(chatId, 'voice', uri, {
-          durationMs,
-          mimeType: 'audio/m4a',
-          replyToId: replyTo ?? undefined,
-        });
-        setDraft('');
-        setReplyTo(null);
-        markRead(chatId);
-        scrollToEnd();
-      }
-    } catch {
-      Alert.alert('Voice message failed', 'The recording could not be sent.');
-    } finally {
-      setMediaBusy(false);
-      setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
-    }
+  const showMediaComingSoon = () => {
+    Alert.alert('Coming soon', 'Photo, video, and voice sharing will be enabled in a future update.');
   };
 
   const replyTarget = replyTo ? byId.get(replyTo) : undefined;
@@ -441,36 +336,6 @@ export function ConversationScreen({ route, navigation }: any) {
           ]}
         >
         <View style={styles.composerRow}>
-        {recorderState.isRecording ? (
-          <>
-          <View style={[styles.recDot, { backgroundColor: palette.bad }]} />
-          <Text style={[styles.recTime, { color: palette.textPrimary }]}>
-            {formatDuration(recorderState.durationMillis ?? 0)}
-          </Text>
-          <Text style={[styles.recHint, { color: palette.textSecondary }]} numberOfLines={1}>
-            Recording voice note
-          </Text>
-          <IconButton
-            name="trash"
-            label="Discard recording"
-            size={44}
-            iconSize={22}
-            color={palette.textSecondary}
-            backgroundColor={palette.bgSurface}
-            onPress={() => void stopRecording(false)}
-          />
-          <IconButton
-            name="send"
-            label="Send voice note"
-            size={44}
-            iconSize={22}
-            color={palette.onAccent}
-            backgroundColor={palette.ember}
-            onPress={() => void stopRecording(true)}
-          />
-          </>
-        ) : (
-          <>
           <IconButton
             name="plus"
             label="Attach"
@@ -478,7 +343,7 @@ export function ConversationScreen({ route, navigation }: any) {
             iconSize={22}
             color={palette.textSecondary}
             backgroundColor={palette.bgSurface}
-            onPress={() => void pickMedia()}
+            onPress={showMediaComingSoon}
           />
           <View style={[styles.inputPill, { backgroundColor: palette.bgSurface }]}>
             <TextInput
@@ -511,11 +376,9 @@ export function ConversationScreen({ route, navigation }: any) {
               iconSize={22}
               color={palette.textSecondary}
               backgroundColor={palette.bgRaised}
-              onPress={() => void startRecording()}
+              onPress={showMediaComingSoon}
             />
           )}
-          </>
-        )}
         </View>
         </BlurView>
         ) : null}

@@ -27,7 +27,6 @@ import {
   set,
   get,
 } from 'firebase/database';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ChatMessage, DirectoryUser } from './types';
 
 export type RealtimeEvent =
@@ -256,92 +255,6 @@ export function subscribeRealtime(listener: Listener) {
   return () => {
     listeners = listeners.filter((item) => item !== listener);
   };
-}
-
-async function uriToBlob(uri: string): Promise<Blob> {
-  if (
-    Platform.OS === 'web' ||
-    uri.startsWith('http://') ||
-    uri.startsWith('https://') ||
-    uri.startsWith('data:') ||
-    uri.startsWith('blob:')
-  ) {
-    const response = await fetch(uri);
-    return await response.blob();
-  }
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = () => {
-      resolve(xhr.response as Blob);
-    };
-    xhr.onerror = (e) => {
-      reject(new TypeError(`Failed to read file into blob: ${String(e)}`));
-    };
-    xhr.responseType = 'blob';
-    xhr.open('GET', uri, true);
-    xhr.send(null);
-  });
-}
-
-export async function publishMediaMessage(payload: {
-  to: string;
-  uri: string;
-  kind: 'image' | 'video' | 'voice';
-  mimeType?: string;
-  name?: string;
-  duration?: number;
-}): Promise<{ mediaUri: string; messageId: string }> {
-  if (!database || !username) throw new Error('Realtime connection is not ready. Please sign in again.');
-  const app = getApps()[0];
-  const auth = getAuth();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('No authenticated Firebase session is available. Please log in again.');
-
-  const blob = await uriToBlob(payload.uri);
-  const ext = payload.kind === 'voice' ? '.m4a' : payload.kind === 'video' ? '.mp4' : '.jpg';
-  const defaultMime =
-    payload.kind === 'voice' ? 'audio/m4a' : payload.kind === 'video' ? 'video/mp4' : 'image/jpeg';
-  const mimeType = payload.mimeType || defaultMime;
-  const safeName = payload.name ? payload.name : `${Date.now()}${ext}`;
-  // Use the Firebase UID as the folder so it matches the Storage rule:
-  //   allow write: if request.auth.uid == ownerId
-  const mediaId = `${uid}/${Date.now()}-${safeName}`;
-  const fileRef = storageRef(getStorage(app), `media/${mediaId}`);
-
-  let mediaUri = '';
-  try {
-    await uploadBytes(fileRef, blob, { contentType: mimeType });
-    mediaUri = await getDownloadURL(fileRef);
-  } finally {
-    if (typeof (blob as any).close === 'function') {
-      (blob as any).close();
-    }
-  }
-
-  // Handle duration whether in seconds or milliseconds
-  let mediaDuration: number | undefined = undefined;
-  if (payload.duration != null) {
-    mediaDuration = Math.round(payload.duration < 1000 ? payload.duration * 1000 : payload.duration);
-  }
-
-  const message = {
-    id: `msg-${Math.random().toString(36).slice(2, 8)}`,
-    chatId: chatIdFor(username, payload.to),
-    sender: username,
-    senderUid: uid,
-    mine: false,
-    kind: payload.kind,
-    text: payload.kind === 'voice' ? 'Voice message' : payload.kind === 'video' ? 'Video' : 'Photo',
-    mediaUri,
-    mediaMimeType: mimeType,
-    mediaName: payload.name,
-    mediaDuration,
-    createdAt: Date.now(),
-    receipt: 'delivered' as const,
-    reactions: [],
-  };
-  await set(push(ref(database, `inbox/${payload.to}`)), { ...message, to: payload.to });
-  return { mediaUri, messageId: message.id };
 }
 
 export function publishRealtime(payload: { type: 'message'; to: string; text: string; replyToId?: string; clientId?: string }) {

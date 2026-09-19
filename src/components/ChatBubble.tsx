@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChatMessage } from '../lib/types';
@@ -126,10 +126,10 @@ export function ChatBubble({
         </Pressable>
       ) : null}
       {msg.mediaUri && msg.kind === 'voice' ? (
-        <Pressable onPress={() => Linking.openURL(msg.mediaUri!)} style={styles.mediaCard}>
+        <View style={styles.mediaCard}>
           <Icon name="mic" size={22} color={ink} />
-          <Text style={[styles.mediaLabel, { color: ink }]}>Play voice message</Text>
-        </Pressable>
+          <Text style={[styles.mediaLabel, { color: ink }]}>Voice messages coming soon</Text>
+        </View>
       ) : null}
       <Text style={[styles.text, { color: ink }]}>{msg.text}</Text>
       <View style={styles.metaRow}>

@@ -18,9 +18,7 @@
       "infoPlist": {
         "NSFaceIDUsageDescription": "Unlock Whisper — your per-chat hidden space.",
         "NSCameraUsageDescription": "Scan a friend's profile QR to add them on Tangent.",
-        "NSContactsUsageDescription": "Find your contacts who are already on Tangent.",
-        "NSPhotoLibraryUsageDescription": "Choose photos and videos to share in a chat.",
-        "NSMicrophoneUsageDescription": "Record voice messages to share in a chat."
+        "NSContactsUsageDescription": "Find your contacts who are already on Tangent."
       }
     },
     "android": {
@@ -36,8 +34,7 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "CAMERA",
-        "READ_CONTACTS",
-        "RECORD_AUDIO"
+        "READ_CONTACTS"
       ],
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -58,14 +55,6 @@
         "expo-contacts",
         {
           "contactsPermission": "Find your contacts who are already on Tangent."
-        }
-      ],
-      "expo-audio"
-      ,[
-        "expo-image-picker",
-        {
-          "photosPermission": "Choose photos and videos to share in a chat.",
-          "microphonePermission": "Record voice messages to share in a chat."
         }
       ]
     ]
