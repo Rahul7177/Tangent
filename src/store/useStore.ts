@@ -196,9 +196,18 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
         }
       });
     }
-    void connectRealtime(cleanName, uname, phone.trim()).catch((error: unknown) => {
-      console.warn('Firebase realtime is unavailable:', error);
-    });
+    void connectRealtime(cleanName, uname, phone.trim())
+      .then((profile) => {
+        if (profile && profile.username !== get().currentUser.username) {
+          set({
+            userName: profile.name,
+            currentUser: { name: profile.name, username: profile.username, phone: profile.phone },
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('Firebase realtime is unavailable:', error);
+      });
   },
 
   authDraft: { ...emptyDraft },

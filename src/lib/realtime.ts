@@ -168,7 +168,7 @@ function userRecord(name: string, phone: string) {
 }
 
 export async function connectRealtime(name: string, nextUsername: string, phone = '') {
-  if (!configured) return;
+  if (!configured) return undefined;
   username = nextUsername.toLowerCase();
   if (connectedUsername === username && database) return;
   detachRealtime.forEach((detach) => detach());
@@ -178,11 +178,16 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   const app = getApps()[0];
   database = getDatabase(app);
 
-  const profileRef = ref(database, `users/${username}`);
-  const existingProfile = (await get(profileRef)).val() as { ownerId?: string } | null;
-  if (existingProfile?.ownerId && existingProfile.ownerId !== signedInUser.uid) {
-    throw new Error('This browser session belongs to a different Tangent account. Log out and sign in again.');
+  const usersSnapshot = await get(ref(database, 'users'));
+  const ownedProfile = Object.values(usersSnapshot.val() ?? {}).find(
+    (profile) => (profile as { ownerId?: string }).ownerId === signedInUser.uid,
+  ) as { name?: string; username?: string; phone?: string } | undefined;
+  if (ownedProfile?.username && ownedProfile.username !== username) {
+    username = ownedProfile.username;
+    name = ownedProfile.name ?? name;
+    phone = ownedProfile.phone ?? phone;
   }
+  const profileRef = ref(database, `users/${username}`);
   await set(profileRef, userRecord(name, phone));
   detachRealtime.push(onValue(ref(database, 'users'), (snapshot) => {
     const users = Object.values(snapshot.val() ?? {}) as DirectoryUser[];
@@ -243,6 +248,7 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
     }
   }));
   connectedUsername = username;
+  return { name, username, phone };
 }
 
 function emitInboxRecord(key: string | null, value: unknown) {
@@ -263,7 +269,7 @@ function emitInboxRecord(key: string | null, value: unknown) {
     mediaName: raw.mediaName,
     mediaDuration: raw.mediaDuration,
   };
-  if (message.sender !== username) emit({ type: 'message', message });
+  if (message.sender && message.sender !== username) emit({ type: 'message', message });
 }
 
 export function subscribeRealtime(listener: Listener) {
