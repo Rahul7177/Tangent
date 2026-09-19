@@ -79,6 +79,14 @@ export function ConversationScreen({ route, navigation }: any) {
     });
   };
 
+  const scrollToMessage = (messageId: string) => {
+    const index = msgs.findIndex((message) => message.id === messageId);
+    if (index < 0) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.45 });
+    });
+  };
+
   // Stay pinned to latest when new messages arrive or keyboard opens.
   useEffect(() => {
     scrollToEnd();
@@ -186,7 +194,12 @@ export function ConversationScreen({ route, navigation }: any) {
         </BlurView>
 
         {pinned.length > 0 ? (
-          <View style={[styles.pinnedBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}>
+          <Pressable
+            onPress={() => scrollToMessage(pinned[0].id)}
+            accessibilityRole="button"
+            accessibilityLabel="Jump to pinned message"
+            style={[styles.pinnedBar, { backgroundColor: palette.bgSurface }, glassEdge(palette, dark)]}
+          >
             <Icon name="pin" size={15} color={palette.ember} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.pinnedLabel, { color: palette.ember }]}>Pinned messages</Text>
@@ -194,7 +207,7 @@ export function ConversationScreen({ route, navigation }: any) {
                 {pinned[0].text}{pinned.length > 1 ? `  +${pinned.length - 1}` : ''}
               </Text>
             </View>
-          </View>
+          </Pressable>
         ) : null}
 
         {/* Messages — chronological, anchored top, grows down, native scrollbar */}
