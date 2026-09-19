@@ -12,8 +12,6 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
-// @ts-ignore: TS uses the web typings by default, but Metro uses the RN entry point.
-import { getReactNativePersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 // AsyncStorage v2 default import — used for React Native auth persistence
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -57,6 +55,24 @@ let detachRealtime: (() => void)[] = [];
 let authInstance: ReturnType<typeof getAuth> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Firebase JS SDK 12 no longer exposes the old `firebase/auth/react-native`
+// entry point. This adapter gives initializeAuth the same durable AsyncStorage
+// persistence contract on Android and iOS.
+const nativePersistence = {
+  type: 'LOCAL',
+  _isAvailable: () => Promise.resolve(true),
+  _set: async (key: string, value: unknown) => {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  },
+  _get: async (key: string) => {
+    const value = await AsyncStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  },
+  _remove: async (key: string) => {
+    await AsyncStorage.removeItem(key);
+  },
+};
+
 export function firebaseReady() {
   return configured;
 }
@@ -72,7 +88,7 @@ function firebaseAuth() {
     // so no messages are ever delivered.
     try {
       authInstance = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage),
+        persistence: nativePersistence as never,
       });
     } catch {
       // initializeAuth throws if auth was already initialized (e.g. hot-reload)
