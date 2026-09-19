@@ -130,9 +130,8 @@ export const useStore = create<TangentState>()(persist((set, get) => ({
         if (event.type === 'message') {
           const incoming = event.message;
           const current = get().currentUser;
-          if (incoming.sender === current.username) return;
           const sender = get().directory.find((user) => user.username === incoming.sender);
-          const chatId = directChatId(current.username, incoming.sender);
+          const chatId = incoming.chatId || directChatId(current.username, incoming.sender);
           set((s) => {
             const exists = s.messages.some((message) => message.id === incoming.id);
             const nextMessages = exists
