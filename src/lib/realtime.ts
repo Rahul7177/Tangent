@@ -5,13 +5,18 @@ import {
   GoogleAuthProvider,
   browserPopupRedirectResolver,
   getAuth,
+  initializeAuth,
   onAuthStateChanged,
   signOut,
   signInWithEmailAndPassword,
   signInWithPopup,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
+// @ts-ignore: TS uses the web typings by default, but Metro uses the RN entry point.
+import { getReactNativePersistence } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+// AsyncStorage v2 default import — used for React Native auth persistence
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getDatabase,
   onChildAdded,
@@ -61,9 +66,25 @@ function firebaseAuth() {
   if (!configured) throw new Error('Firebase is not configured. Add the values from .env.local.');
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   if (authInstance) return authInstance;
-  authInstance = getAuth(app);
+  if (Platform.OS !== 'web') {
+    // On React Native, persist auth state across app restarts using AsyncStorage.
+    // Without this, getAuth() defaults to in-memory and every cold start loses
+    // the session, causing connectRealtime to fail and leaving `database` null
+    // so no messages are ever delivered.
+    try {
+      authInstance = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } catch {
+      // initializeAuth throws if auth was already initialized (e.g. hot-reload)
+      authInstance = getAuth(app);
+    }
+  } else {
+    authInstance = getAuth(app);
+  }
   return authInstance;
 }
+
 
 async function prepareAuth() {
   const auth = firebaseAuth();
@@ -170,25 +191,10 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
     }
   };
   detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
-    const raw = snapshot.val() as Partial<ChatMessage>;
-    const message: ChatMessage = {
-      id: raw.id ?? snapshot.key ?? `msg-${Date.now()}`,
-      chatId: raw.chatId ?? '',
-      sender: raw.sender ?? 'unknown',
-      mine: false,
-      kind: raw.kind ?? 'text',
-      text: raw.text ?? '',
-      createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
-      receipt: raw.receipt ?? 'delivered',
-      replyToId: raw.replyToId,
-      reactions: Array.isArray(raw.reactions) ? raw.reactions : [],
-      mediaUri: raw.mediaUri,
-      mediaMimeType: raw.mediaMimeType,
-      mediaName: raw.mediaName,
-      mediaDuration: raw.mediaDuration,
-    };
-    if (message.sender !== username) emit({ type: 'message', message });
+    emitInboxRecord(snapshot.key, snapshot.val());
   }, handleRealtimeError));
+  const inboxSnapshot = await get(ref(database, `inbox/${username}`));
+  inboxSnapshot.forEach((snapshot) => emitInboxRecord(snapshot.key, snapshot.val()));
   detachRealtime.push(onChildAdded(ref(database, `requests/${username}`), (snapshot) => {
     const request = snapshot.val() as {
       id: string;
@@ -226,11 +232,57 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
   connectedUsername = username;
 }
 
+function emitInboxRecord(key: string | null, value: unknown) {
+  const raw = value as Partial<ChatMessage>;
+  const message: ChatMessage = {
+    id: raw.id ?? key ?? `msg-${Date.now()}`,
+    chatId: raw.chatId ?? '',
+    sender: raw.sender ?? 'unknown',
+    mine: false,
+    kind: raw.kind ?? 'text',
+    text: raw.text ?? '',
+    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+    receipt: raw.receipt ?? 'delivered',
+    replyToId: raw.replyToId,
+    reactions: Array.isArray(raw.reactions) ? raw.reactions : [],
+    mediaUri: raw.mediaUri,
+    mediaMimeType: raw.mediaMimeType,
+    mediaName: raw.mediaName,
+    mediaDuration: raw.mediaDuration,
+  };
+  if (message.sender !== username) emit({ type: 'message', message });
+}
+
 export function subscribeRealtime(listener: Listener) {
   listeners.push(listener);
   return () => {
     listeners = listeners.filter((item) => item !== listener);
   };
+}
+
+async function uriToBlob(uri: string): Promise<Blob> {
+  if (
+    Platform.OS === 'web' ||
+    uri.startsWith('http://') ||
+    uri.startsWith('https://') ||
+    uri.startsWith('data:') ||
+    uri.startsWith('blob:')
+  ) {
+    const response = await fetch(uri);
+    return await response.blob();
+  }
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      resolve(xhr.response as Blob);
+    };
+    xhr.onerror = (e) => {
+      reject(new TypeError(`Failed to read file into blob: ${String(e)}`));
+    };
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
 }
 
 export async function publishMediaMessage(payload: {
@@ -243,24 +295,49 @@ export async function publishMediaMessage(payload: {
 }) {
   if (!database || !username) return;
   const app = getApps()[0];
-  const response = await fetch(payload.uri);
-  const blob = await response.blob();
-  const mediaId = `${username}/${Date.now()}-${payload.name ?? 'media'}`;
+  const auth = getAuth();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('No authenticated Firebase session is available. Please log in again.');
+
+  const blob = await uriToBlob(payload.uri);
+  const ext = payload.kind === 'voice' ? '.m4a' : payload.kind === 'video' ? '.mp4' : '.jpg';
+  const defaultMime =
+    payload.kind === 'voice' ? 'audio/m4a' : payload.kind === 'video' ? 'video/mp4' : 'image/jpeg';
+  const mimeType = payload.mimeType || defaultMime;
+  const safeName = payload.name ? payload.name : `${Date.now()}${ext}`;
+  // Use the Firebase UID as the folder so it matches the Storage rule:
+  //   allow write: if request.auth.uid == ownerId
+  const mediaId = `${uid}/${Date.now()}-${safeName}`;
   const fileRef = storageRef(getStorage(app), `media/${mediaId}`);
-  await uploadBytes(fileRef, blob, payload.mimeType ? { contentType: payload.mimeType } : undefined);
-  const mediaUri = await getDownloadURL(fileRef);
+
+  let mediaUri = '';
+  try {
+    await uploadBytes(fileRef, blob, { contentType: mimeType });
+    mediaUri = await getDownloadURL(fileRef);
+  } finally {
+    if (typeof (blob as any).close === 'function') {
+      (blob as any).close();
+    }
+  }
+
+  // Handle duration whether in seconds or milliseconds
+  let mediaDuration: number | undefined = undefined;
+  if (payload.duration != null) {
+    mediaDuration = Math.round(payload.duration < 1000 ? payload.duration * 1000 : payload.duration);
+  }
+
   const message = {
     id: `msg-${Math.random().toString(36).slice(2, 8)}`,
     chatId: chatIdFor(username, payload.to),
     sender: username,
-    senderUid: getAuth().currentUser?.uid ?? '',
+    senderUid: uid,
     mine: false,
     kind: payload.kind,
     text: payload.kind === 'voice' ? 'Voice message' : payload.kind === 'video' ? 'Video' : 'Photo',
     mediaUri,
-    mediaMimeType: payload.mimeType,
+    mediaMimeType: mimeType,
     mediaName: payload.name,
-    mediaDuration: payload.duration,
+    mediaDuration,
     createdAt: Date.now(),
     receipt: 'delivered' as const,
     reactions: [],
