@@ -190,11 +190,9 @@ export async function connectRealtime(name: string, nextUsername: string, phone 
       }, 1500);
     }
   };
-  detachRealtime.push(onChildAdded(ref(database, `inbox/${username}`), (snapshot) => {
-    emitInboxRecord(snapshot.key, snapshot.val());
+  detachRealtime.push(onValue(ref(database, `inbox/${username}`), (snapshot) => {
+    snapshot.forEach((child) => emitInboxRecord(child.key, child.val()));
   }, handleRealtimeError));
-  const inboxSnapshot = await get(ref(database, `inbox/${username}`));
-  inboxSnapshot.forEach((snapshot) => emitInboxRecord(snapshot.key, snapshot.val()));
   detachRealtime.push(onChildAdded(ref(database, `requests/${username}`), (snapshot) => {
     const request = snapshot.val() as {
       id: string;
